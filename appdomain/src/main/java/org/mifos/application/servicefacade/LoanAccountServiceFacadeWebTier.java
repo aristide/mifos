@@ -578,9 +578,26 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
             boolean isRepaymentIndependentOfMeetingEnabled = new ConfigurationBusinessService().isRepaymentIndepOfMeetingEnabled();
 
             LoanDisbursementDateFactory loanDisbursementDateFactory = new LoanDisbursmentDateFactoryImpl();
-            LoanDisbursementDateFinder loanDisbursementDateFinder = loanDisbursementDateFactory.create(customer, loanProduct, isRepaymentIndependentOfMeetingEnabled, isLoanWithBackdatedPayments);
-            LocalDate nextPossibleDisbursementDate = loanDisbursementDateFinder.findClosestMatchingDateFromAndInclusiveOf(new LocalDate());
+            LoanDisbursementDateFinder loanDisbursementDateFinder = null;
+            LocalDate currentDate = new LocalDate();
+            
+            if (customer.getCustomerMeetingValue().isMonthly()) {
+                loanDisbursementDateFinder = loanDisbursementDateFactory.create(customer,
+                        loanProduct, isRepaymentIndependentOfMeetingEnabled, isLoanWithBackdatedPayments);
+            
+            } else {
+                LocalDate meetingStartDate = new LocalDate(customer.getCustomerMeetingValue().getMeetingStartDate());
+                if (meetingStartDate.isAfter(currentDate)) {
+                    currentDate = meetingStartDate;
+                    loanDisbursementDateFinder = loanDisbursementDateFactory.create(customer, loanProduct,
+                            true, isLoanWithBackdatedPayments);
+                } else {
+                    loanDisbursementDateFinder = loanDisbursementDateFactory.create(customer, loanProduct,
+                            isRepaymentIndependentOfMeetingEnabled, isLoanWithBackdatedPayments);
+                }
+            }
 
+            LocalDate nextPossibleDisbursementDate = loanDisbursementDateFinder.findClosestMatchingDateFromAndInclusiveOf(currentDate);
             LoanAmountOption eligibleLoanAmount = loanProduct.eligibleLoanAmount(customer.getMaxLoanAmount(loanProduct), customer.getMaxLoanCycleForProduct(loanProduct));
             LoanOfferingInstallmentRange eligibleNoOfInstall = loanProduct.eligibleNoOfInstall(customer.getMaxLoanAmount(loanProduct), customer.getMaxLoanCycleForProduct(loanProduct));
 
@@ -1878,13 +1895,11 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
         Money waivedRepaymentAmount = repaymentAmount.subtract(waiverAmount);
 
         List<SavingsDetailDto> savingsInUse = clientServiceFacade.retrieveSavingsInUseForClient(loan.getCustomer().getCustomerId());
-        List<ListItem<String>> accountsForTransfer = new ArrayList<ListItem<String>>();
+        List<SavingsDetailDto> accountsForTransfer = new ArrayList<SavingsDetailDto>();
         if (savingsInUse != null) {
             for (SavingsDetailDto savingsAccount : savingsInUse) {
                 if (savingsAccount.getAccountStateId().equals(AccountState.SAVINGS_ACTIVE.getValue())) {
-                    ListItem<String> listItem = new ListItem<String>(savingsAccount.getGlobalAccountNum(),
-                            savingsAccount.getGlobalAccountNum() + " - " + savingsAccount.getPrdOfferingName());
-                    accountsForTransfer.add(listItem);
+                    accountsForTransfer.add(savingsAccount);
                 }
             }
         }

@@ -365,6 +365,21 @@ public class ClientTest extends UiTestCaseBase {
         viewDetailsPage.verifySpouseFather("FatherFirstnameTest FatherLastNameTest");
         ClientNotesPage seeAllNotes = viewDetailsPage.navigateToAllNotesPage();
         seeAllNotes.verifySeeAllNotesTitle("client1 lastname");
+        
+        // extension to verify MIFOS-5685
+        applicationDatabaseOperation.updateGLIM(1);
+        applicationDatabaseOperation.updateLSIM(1);
+        seeAllNotes.navigateBack();
+        editPersonalInfoPage = viewDetailsPage.editPersonalInformation();
+        parameters2.setDateOfBirthYYYY("1961");
+        parameters2.setDateOfBirthMM("07");
+        parameters2.setDateOfBirthDD("02");
+        viewDetailsPage = editPersonalInfoPage.submitAndNavigateToViewDetailsPage(parameters2);
+        viewDetailsPage.verifyDateOfBirth("02", "07", "1961");
+        seeAllNotes = viewDetailsPage.navigateToAllNotesPage();
+        seeAllNotes.verifySeeAllNotesTitle("client1 lastname");
+        applicationDatabaseOperation.updateGLIM(0);
+        applicationDatabaseOperation.updateLSIM(0);
     }
 
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
@@ -1103,11 +1118,28 @@ public class ClientTest extends UiTestCaseBase {
 
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     // http://mifosforge.jira.com/browse/MIFOSTEST-48
-    @Test(enabled=false)  //blocked by http://mifosforge.jira.com/browse/MIFOS-4272 - ldomzalski
+    //https://mifosforge.jira.com/browse/MIFOS-5843
+    @Test(enabled=true)
     public void removeClientWithLoanFromGroup() throws Exception {
         // Given
-        String clientName = "client1 lastname";
-        String groupName = navigationHelper.navigateToClientViewDetailsPage(clientName).getGroupMembership();
+    	String clientName = clientTestHelper.createClientAndVerify("loan officer", "MyOfficeDHMFT").getHeading();
+    	clientTestHelper.activateClient(clientName);
+    	
+        // Then
+        clientTestHelper.addClientToGroup(clientName, "groupWithoutLoan");
+
+        CreateLoanAccountSearchParameters searchParams = new CreateLoanAccountSearchParameters();
+    	searchParams.setSearchString(clientName);
+    	searchParams.setLoanProduct("WeeklyFlatLoanWithOneTimeFees");
+		
+		CreateLoanAccountSubmitParameters submitLoanAccountParameters = new CreateLoanAccountSubmitParameters();
+		submitLoanAccountParameters.setDd("22");
+		submitLoanAccountParameters.setMm("01");
+		submitLoanAccountParameters.setYy("2010");
+		String loanAccounntID = loanTestHelper.createLoanAccount(searchParams, submitLoanAccountParameters ).getAccountId();
+		loanTestHelper.activateLoanAccount(loanAccounntID);
+		
+    	String groupName = navigationHelper.navigateToClientViewDetailsPage(clientName).getGroupMembership();
         SavingsProductParameters params = savingsProductHelper.
                 getGenericSavingsProductParameters(new DateTime(2009, 7, 13, 12, 0, 0, 0),
                         SavingsProductParameters.MANDATORY,SavingsProductParameters.GROUPS);

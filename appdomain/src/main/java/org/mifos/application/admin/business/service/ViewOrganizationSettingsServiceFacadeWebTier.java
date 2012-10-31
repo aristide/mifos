@@ -32,6 +32,7 @@ import javax.servlet.http.HttpSession;
 
 import org.apache.commons.lang.StringUtils;
 import org.mifos.accounts.api.TransactionImport;
+import org.mifos.accounts.loan.util.helpers.LoanConstants;
 import org.mifos.application.admin.servicefacade.ViewOrganizationSettingsServiceFacade;
 import org.mifos.application.master.MessageLookup;
 import org.mifos.application.master.business.MifosCurrency;
@@ -122,6 +123,9 @@ public class ViewOrganizationSettingsServiceFacadeWebTier implements ViewOrganiz
         accountingRules.setProperty("minIndebtednessRatio", AccountingRules.getMinIndebtednessRatio().toString());
         accountingRules.setProperty("maxIndebtednessRatio", AccountingRules.getMaxIndebtednessRatio().toString());
         accountingRules.setProperty("digitsAfterDecimalForCashFlow", AccountingRules.getDigitsAfterDecimalForCashFlowValidations().toString());
+        accountingRules.setProperty("GLNamesMode", String.valueOf(AccountingRules.getGlNamesMode()));
+        accountingRules.setProperty("simpleAccountingModule", booleanToYesNo(AccountingRules.getSimpleAccountingStatus()));
+        accountingRules.setProperty("overdueInterestPaidFirst", booleanToYesNo(AccountingRules.isOverdueInterestPaidFirst()));
 
         return accountingRules;
     }
@@ -182,10 +186,13 @@ public class ViewOrganizationSettingsServiceFacadeWebTier implements ViewOrganiz
         misc.setProperty("collectionSheetAdvanceDays", "1");
 
         misc.setProperty("backDatedTransactions", booleanToYesNo(AccountingRules.isBackDatedTxnAllowed()));
+        misc.setProperty("backDatedApprovals", booleanToYesNo(AccountingRules.isBackDatedApprovalAllowed()));
         ConfigurationBusinessService cbs = new ConfigurationBusinessService();
         misc.setProperty("glim", booleanToYesNo(cbs.isGlimEnabled()));
         misc.setProperty("lsim", booleanToYesNo(cbs.isRepaymentIndepOfMeetingEnabled()));
-        
+        MifosConfigurationManager configurationManager = MifosConfigurationManager.getInstance();
+        misc.setProperty("backDatedLoanProductCreationAllowed", booleanToYesNo(
+                configurationManager.getBoolean(LoanConstants.BACK_DATED_LOAN_PRODUCT_CREATION)));
         return misc;
     }
 
