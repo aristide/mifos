@@ -23,6 +23,7 @@ import static org.mifos.accounts.loan.schedule.utils.Utilities.getDaysInBetween;
 import static org.mifos.framework.util.helpers.NumberUtils.max;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -31,6 +32,7 @@ import java.util.TreeMap;
 
 import org.mifos.accounts.loan.business.RepaymentResultsHolder;
 import org.mifos.accounts.loan.schedule.utils.Utilities;
+import org.mifos.config.AccountingRules;
 
 public class Schedule {
     private Map<Integer, Installment> installments;
@@ -119,6 +121,13 @@ public class Schedule {
                     computeInterestTillDueDate(transactionDate, principalOutstanding, installment));
             BigDecimal earlierBalance = balance;
             balance = installment.payPrincipal(balance, transactionDate);
+            
+            if (installment.getDueDate().after(transactionDate)
+                    && earlierBalance.compareTo(installment.getTotalDue().setScale(
+                            AccountingRules.getDigitsAfterDecimal(), RoundingMode.HALF_UP)) == 0) {
+                balance = installment.payInterest(balance, transactionDate);
+            }
+            
             if (earlierBalance.compareTo(balance) > 0) {
                 principalOutstanding = principalOutstanding.subtract(earlierBalance.subtract(balance));
             }

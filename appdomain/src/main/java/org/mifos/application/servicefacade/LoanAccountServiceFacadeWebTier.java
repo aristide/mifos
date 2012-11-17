@@ -579,25 +579,29 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
 
             LoanDisbursementDateFactory loanDisbursementDateFactory = new LoanDisbursmentDateFactoryImpl();
             LoanDisbursementDateFinder loanDisbursementDateFinder = null;
-            LocalDate currentDate = new LocalDate();
+            LocalDate nextPossibleDisbursementDate = null;
+            MeetingBO customerMeeting = customer.getCustomerMeetingValue();
+            LocalDate dateToStart = new LocalDate();
             
-            if (customer.getCustomerMeetingValue().isMonthly()) {
-                loanDisbursementDateFinder = loanDisbursementDateFactory.create(customer,
-                        loanProduct, isRepaymentIndependentOfMeetingEnabled, isLoanWithBackdatedPayments);
-            
-            } else {
-                LocalDate meetingStartDate = new LocalDate(customer.getCustomerMeetingValue().getMeetingStartDate());
-                if (meetingStartDate.isAfter(currentDate)) {
-                    currentDate = meetingStartDate;
-                    loanDisbursementDateFinder = loanDisbursementDateFactory.create(customer, loanProduct,
-                            true, isLoanWithBackdatedPayments);
+            if (customerMeeting.isWeekly()) {
+                
+                LocalDate meetingStartDate = new LocalDate(customerMeeting.getMeetingStartDate());
+                
+                if (dateToStart.isBefore(meetingStartDate)) {
+                    dateToStart = meetingStartDate;
+                    loanDisbursementDateFinder = loanDisbursementDateFactory.create(customer, loanProduct, false, isLoanWithBackdatedPayments);
                 } else {
-                    loanDisbursementDateFinder = loanDisbursementDateFactory.create(customer, loanProduct,
-                            isRepaymentIndependentOfMeetingEnabled, isLoanWithBackdatedPayments);
+                    loanDisbursementDateFinder = loanDisbursementDateFactory.create(
+                            customer, loanProduct, isRepaymentIndependentOfMeetingEnabled, isLoanWithBackdatedPayments);
                 }
+                
+                nextPossibleDisbursementDate = loanDisbursementDateFinder.findClosestMatchingDateFromAndInclusiveOf(dateToStart);  
+            } else {
+                loanDisbursementDateFinder = loanDisbursementDateFactory.create(
+                        customer, loanProduct, isRepaymentIndependentOfMeetingEnabled, isLoanWithBackdatedPayments);
+                nextPossibleDisbursementDate = loanDisbursementDateFinder.findClosestMatchingDateFromAndInclusiveOf(dateToStart);
             }
 
-            LocalDate nextPossibleDisbursementDate = loanDisbursementDateFinder.findClosestMatchingDateFromAndInclusiveOf(currentDate);
             LoanAmountOption eligibleLoanAmount = loanProduct.eligibleLoanAmount(customer.getMaxLoanAmount(loanProduct), customer.getMaxLoanCycleForProduct(loanProduct));
             LoanOfferingInstallmentRange eligibleNoOfInstall = loanProduct.eligibleNoOfInstall(customer.getMaxLoanAmount(loanProduct), customer.getMaxLoanCycleForProduct(loanProduct));
 
