@@ -40,6 +40,8 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeComparator;
 import org.joda.time.Days;
 import org.joda.time.LocalDate;
+import org.mifos.application.servicefacade.ApplicationContextProvider;
+import org.mifos.application.servicefacade.DashboardServiceFacade;
 import org.mifos.application.util.helpers.ActionForwards;
 import org.mifos.calendar.CalendarUtils;
 import org.mifos.config.ClientRules;
@@ -59,6 +61,7 @@ import org.mifos.dto.domain.CenterDescriptionDto;
 import org.mifos.dto.domain.ClientDescriptionDto;
 import org.mifos.dto.domain.CustomerDetailDto;
 import org.mifos.dto.domain.CustomerHierarchyDto;
+import org.mifos.dto.domain.DashboardDto;
 import org.mifos.dto.domain.GroupDescriptionDto;
 import org.mifos.dto.domain.UserDetailDto;
 import org.mifos.framework.hibernate.helper.QueryResult;
@@ -71,6 +74,11 @@ import org.mifos.security.util.UserContext;
 
 public class CustSearchAction extends SearchAction {
 
+    private DashboardServiceFacade dashboardServiceFacade; 
+    
+    public CustSearchAction() {
+        dashboardServiceFacade = ApplicationContextProvider.getBean(DashboardServiceFacade.class);
+    }
     @TransactionDemarcate(joinToken = true)
     public ActionForward get(ActionMapping mapping, ActionForm form, HttpServletRequest request,
             @SuppressWarnings("unused") HttpServletResponse response) throws Exception {
@@ -163,6 +171,10 @@ public class CustSearchAction extends SearchAction {
         if (userDetails.isLoanOfficer()) {
             loadLoanOfficerCustomersHierarchyForSelectedDay(userContext.getId(), request, actionForm);
         }
+        
+        DashboardDto dashboardDto = dashboardServiceFacade.getDashboardDto();
+        SessionUtils.setAttribute("dashboard", dashboardDto, request);
+        
         return mapping.findForward(CustomerConstants.GETHOMEPAGE_SUCCESS);
     }
 
@@ -356,7 +368,7 @@ public class CustSearchAction extends SearchAction {
         }
 
         if (actionForm.getInput() != null && actionForm.getInput().equals("loan")) {
-            QueryResult groupClients = new CustomerPersistence().searchGroupClient(searchString, userContext.getId());
+            QueryResult groupClients = new CustomerPersistence().searchGroupClient(searchString, userContext.getId(), false);
             SessionUtils.setQueryResultAttribute(Constants.SEARCH_RESULTS, groupClients, request);
         } else if (actionForm.getInput() != null && actionForm.getInput().equals("savings")) {
             QueryResult customerForSavings = new CustomerPersistence().searchCustForSavings(searchString, userContext.getId());

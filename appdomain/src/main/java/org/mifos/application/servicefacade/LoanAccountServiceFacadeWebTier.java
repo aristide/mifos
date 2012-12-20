@@ -24,12 +24,15 @@ import static org.apache.commons.lang.StringUtils.EMPTY;
 import static org.mifos.accounts.loan.util.helpers.LoanConstants.MIN_DAYS_BETWEEN_DISBURSAL_AND_FIRST_REPAYMENT_DAY;
 import static org.mifos.framework.util.CollectionUtils.collect;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,11 +54,11 @@ import org.mifos.accounts.business.AccountFlagMapping;
 import org.mifos.accounts.business.AccountNotesEntity;
 import org.mifos.accounts.business.AccountOverpaymentEntity;
 import org.mifos.accounts.business.AccountPaymentEntity;
+import org.mifos.accounts.business.AccountPenaltiesEntity;
 import org.mifos.accounts.business.AccountStateEntity;
 import org.mifos.accounts.business.AccountStateFlagEntity;
 import org.mifos.accounts.business.AccountStateMachines;
 import org.mifos.accounts.business.AccountTrxnEntity;
-import org.mifos.accounts.business.AccountPenaltiesEntity;
 import org.mifos.accounts.business.service.AccountBusinessService;
 import org.mifos.accounts.exceptions.AccountException;
 import org.mifos.accounts.fees.business.AmountFeeBO;
@@ -130,6 +133,7 @@ import org.mifos.application.meeting.util.helpers.MeetingHelper;
 import org.mifos.application.meeting.util.helpers.MeetingType;
 import org.mifos.application.meeting.util.helpers.RankOfDay;
 import org.mifos.application.meeting.util.helpers.WeekDay;
+import org.mifos.application.util.helpers.AccountPaymentDtoComperator;
 import org.mifos.clientportfolio.loan.service.CreateLoanSchedule;
 import org.mifos.clientportfolio.loan.service.MonthlyOnDayOfMonthSchedule;
 import org.mifos.clientportfolio.loan.service.MonthlyOnWeekOfMonthSchedule;
@@ -173,6 +177,7 @@ import org.mifos.customers.personnel.business.PersonnelBO;
 import org.mifos.customers.personnel.persistence.PersonnelDao;
 import org.mifos.customers.personnel.util.helpers.PersonnelLevel;
 import org.mifos.dto.domain.AccountFeeScheduleDto;
+import org.mifos.dto.domain.AccountPaymentDto.AmountWithInterest;
 import org.mifos.dto.domain.AccountPaymentParametersDto;
 import org.mifos.dto.domain.AccountStatusDto;
 import org.mifos.dto.domain.AccountUpdateStatus;
@@ -236,6 +241,7 @@ import org.mifos.dto.screen.LoanSummaryDto;
 import org.mifos.dto.screen.MultipleLoanAccountDetailsDto;
 import org.mifos.dto.screen.RepayLoanDto;
 import org.mifos.dto.screen.RepayLoanInfoDto;
+import org.mifos.dto.screen.UploadedFileDto;
 import org.mifos.framework.exceptions.HibernateSearchException;
 import org.mifos.framework.exceptions.PageExpiredException;
 import org.mifos.framework.exceptions.PersistenceException;
@@ -243,6 +249,7 @@ import org.mifos.framework.exceptions.PropertyNotFoundException;
 import org.mifos.framework.exceptions.ServiceException;
 import org.mifos.framework.exceptions.StatesInitializationException;
 import org.mifos.framework.exceptions.SystemException;
+import org.mifos.framework.fileupload.service.LoanFileService;
 import org.mifos.framework.hibernate.helper.HibernateTransactionHelper;
 import org.mifos.framework.hibernate.helper.HibernateTransactionHelperForStaticHibernateUtil;
 import org.mifos.framework.hibernate.helper.QueryResult;
@@ -269,11 +276,14 @@ import org.mifos.security.util.SecurityConstants;
 import org.mifos.security.util.UserContext;
 import org.mifos.service.BusinessRuleException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade {
 
+    private static final Integer PARENT_LOAN = 1;
+    private static final Integer MEMBER_LOAN = 0;
+    private static final Integer OTHER_LOAN = -1;
+    
     private final OfficeDao officeDao;
     private final LoanProductDao loanProductDao;
     private final CustomerDao customerDao;
@@ -314,6 +324,9 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
     private final InstallmentsValidator installmentsValidator;
     private final HolidayServiceFacade holidayServiceFacade;
 
+    @Autowired
+    private LoanFileService loanFileService;
+    
     @Autowired
     public LoanAccountServiceFacadeWebTier(OfficeDao officeDao, LoanProductDao loanProductDao, CustomerDao customerDao,
                                            PersonnelDao personnelDao, FundDao fundDao, LoanDao loanDao,
@@ -449,22 +462,31 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
         final boolean isGroup = customer.isGroup();
         final boolean isGlimEnabled = configurationPersistence.isGlimEnabled();
         final boolean isLsimEnabled = configurationPersistence.isRepaymentIndepOfMeetingEnabled();
-
+        final boolean isGroupLoanWithMembersEnabled = AccountingRules.isGroupLoanWithMembers();
+        
         List<PrdOfferingDto> loanProductDtos = retrieveActiveLoanProductsApplicableForCustomer(customer, isLsimEnabled);
 
         LoanCreationGlimDto loanCreationGlimDto = null;
         List<LoanAccountDetailsDto> clientDetails = new ArrayList<LoanAccountDetailsDto>();
 
         Errors errors = new Errors();
-        if (isGroup && isGlimEnabled) {
+        List<ErrorEntry> errorEntry = new ArrayList<ErrorEntry>();
+        if (isGroup && isGlimEnabled && isGroupLoanWithMembersEnabled) {
+            String defaultMessage ="New Group Loan option is enabled in configuration file and also GLIM option is enabled in the database. Loan for Group will be created using new Group Loan approach. Please turn off GLIM option in database. If you want to create Loan for Group using old approach, then please disable AccountingRules.GroupLoanWithMembers option in configuration file and restart Mifos.";
+            errorEntry.add(new ErrorEntry("createLoanAccount.glim.and.new.glim.are.enabled", "activeClients2", defaultMessage));
+            errors.addErrors(errorEntry);
+        }
+        
+        if (isGroup && (isGlimEnabled || isGroupLoanWithMembersEnabled)) {
             final List<ValueListElement> loanPurposes = loanProductDao.findAllLoanPurposes();
             final List<ClientBO> activeClientsOfGroup = customerDao.findActiveClientsUnderGroup(customer);
             loanCreationGlimDto = new LoanCreationGlimDto(loanPurposes);
 
             if (activeClientsOfGroup == null || activeClientsOfGroup.size() < 2) {
+                errorEntry.clear();
                 String defaultMessage = "Group loan is not allowed as there must be at least two active clients within the group when Group loan with individual monitoring (GLIM) is enabled";
-                ErrorEntry errorEntry  = new ErrorEntry("createLoanAccount.glim.invalid.less.than.two.active.clients.in.group", "activeClients", defaultMessage);
-                errors.addErrors(Arrays.asList(errorEntry));
+                errorEntry.add(new ErrorEntry("createLoanAccount.glim.invalid.less.than.two.active.clients.in.group", "activeClients", defaultMessage));
+                errors.addErrors(errorEntry);
                 loanProductDtos = new ArrayList<PrdOfferingDto>();
             } else {
 
@@ -677,10 +699,13 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
             // GLIM specific
             final boolean isGroup = customer.isGroup();
             final boolean isGlimEnabled = configurationPersistence.isGlimEnabled();
+            
+            //Group Loan Account with members specific
+            final boolean isGroupLoanWithMembersEnabled = AccountingRules.isGroupLoanWithMembers();
 
             List<LoanAccountDetailsDto> clientDetails = new ArrayList<LoanAccountDetailsDto>();
 
-            if (isGroup && isGlimEnabled) {
+            if (isGroup && (isGlimEnabled || isGroupLoanWithMembersEnabled)) {
                 final List<ClientBO> activeClientsOfGroup = customerDao.findActiveClientsUnderGroup(customer);
 
                 if (activeClientsOfGroup == null || activeClientsOfGroup.isEmpty()) {
@@ -729,7 +754,7 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
                     BigDecimal.valueOf(eligibleLoanAmount.getMaxLoanAmount()), BigDecimal.valueOf(eligibleLoanAmount.getMinLoanAmount()), defaultInterestRate, maxInterestRate, minInterestRate,
                     eligibleNoOfInstall.getDefaultNoOfInstall().intValue(), eligibleNoOfInstall.getMaxNoOfInstall().intValue(), eligibleNoOfInstall.getMinNoOfInstall().intValue(), nextPossibleDisbursementDate,
                     daysOfTheWeekOptions, weeksOfTheMonthOptions, variableInstallmentsAllowed, fixedRepaymentSchedule, minGapInDays, maxGapInDays, minInstallmentAmount, compareCashflowEnabled,
-                    isGlimEnabled, isGroup, clientDetails, appConfig, defaultPenalties, disbursalPaymentTypes, repaymentpaymentTypes);
+                    isGlimEnabled, isGroup, clientDetails, appConfig, defaultPenalties, disbursalPaymentTypes, repaymentpaymentTypes, isGroupLoanWithMembersEnabled);
 
         } catch (SystemException e) {
             throw new MifosRuntimeException(e);
@@ -1239,7 +1264,6 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
 
                 customer.updatePerformanceHistoryOnDisbursement(loan, loan.getLoanAmount());
                 // end of refactoring of loan disbural
-
                 this.loanDao.save(loan);
                 transactionHelper.flushSession();
 
@@ -1370,6 +1394,10 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
                             MeetingType.LOAN_INSTALLMENT, customer.getCustomerMeeting().getMeeting().getMeetingPlace(),
                             monthRank);
                 }
+            } else {
+                Short recurEvery = recurringSchedule.getEvery().shortValue();
+                newMeetingForRepaymentDay = new MeetingBO(recurEvery, repaymentStartDate, MeetingType.LOAN_INSTALLMENT,
+                        customer.getCustomerMeeting().getMeeting().getMeetingPlace());
             }
             return newMeetingForRepaymentDay;
         } catch (NumberFormatException nfe) {
@@ -1421,10 +1449,9 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
         for (LoanActivityEntity loanActivity : loanAccountActivityDetails) {
             loanActivityViewSet.add(loanActivity.toDto());
         }
-
         return loanActivityViewSet;
     }
-
+    
     @Override
     public LoanInstallmentDetailsDto retrieveInstallmentDetails(Integer accountId) {
         MifosUser mifosUser = (MifosUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -1438,9 +1465,23 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
             throw new MifosRuntimeException(e.getMessage(), e);
         }
         
-        InstallmentDetailsDto viewUpcomingInstallmentDetails = getUpcomingInstallmentDetails(loanBO.getDetailsOfNextInstallment(), loanBO.getCurrency());
-        InstallmentDetailsDto viewOverDueInstallmentDetails = getOverDueInstallmentDetails(loanBO.getDetailsOfInstallmentsInArrears(), loanBO.getCurrency());
-
+        InstallmentDetailsDto viewUpcomingInstallmentDetails;
+        InstallmentDetailsDto viewOverDueInstallmentDetails;
+        
+        if (loanBO.isGroupLoanAccount() && null == loanBO.getParentAccount()) {
+            List <AccountActionDateEntity> memberDetailsOfNextInstallment = new ArrayList<AccountActionDateEntity>();
+            List <List<AccountActionDateEntity>> memberDetailsOfInstallmentsInArrears = new ArrayList<List<AccountActionDateEntity>>();
+            for (LoanBO member: loanBO.getMemberAccounts()) {
+                memberDetailsOfNextInstallment.add(member.getDetailsOfNextInstallment());
+                memberDetailsOfInstallmentsInArrears.add(member.getDetailsOfInstallmentsInArrears());
+            }
+            viewUpcomingInstallmentDetails = getUpcomingInstallmentDetailsForGroupLoan(memberDetailsOfNextInstallment, loanBO.getCurrency());
+            viewOverDueInstallmentDetails = getOverDueInstallmentDetailsForGroupLoan(memberDetailsOfInstallmentsInArrears, loanBO.getCurrency());
+        }
+        else {
+            viewUpcomingInstallmentDetails = getUpcomingInstallmentDetails(loanBO.getDetailsOfNextInstallment(), loanBO.getCurrency());
+            viewOverDueInstallmentDetails = getOverDueInstallmentDetails(loanBO.getDetailsOfInstallmentsInArrears(), loanBO.getCurrency());
+        }
         Money upcomingInstallmentSubTotal = new Money(loanBO.getCurrency(), viewUpcomingInstallmentDetails.getSubTotal());
         Money overdueInstallmentSubTotal = new Money(loanBO.getCurrency(), viewOverDueInstallmentDetails.getSubTotal());
         Money totalAmountDue = upcomingInstallmentSubTotal.add(overdueInstallmentSubTotal);
@@ -1531,6 +1572,32 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
         String zero = new Money(currency).toString();
         return new InstallmentDetailsDto(zero, zero, zero, zero, zero);
     }
+    
+    private InstallmentDetailsDto getUpcomingInstallmentDetailsForGroupLoan(
+            final List<AccountActionDateEntity> upcomingAccountActionDate, final MifosCurrency currency) {
+        if (upcomingAccountActionDate != null && !upcomingAccountActionDate.isEmpty()) {
+            Money subTotal = new Money(Money.getDefaultCurrency());
+            Money principalDue = new Money(Money.getDefaultCurrency());
+            Money interestDue = new Money(Money.getDefaultCurrency());
+            Money totalFeesDueWithMiscFee = new Money(Money.getDefaultCurrency());
+            Money penaltyDue = new Money(Money.getDefaultCurrency());
+            
+            for (AccountActionDateEntity accAction : upcomingAccountActionDate) {
+                LoanScheduleEntity upcomingInstallment = (LoanScheduleEntity) accAction;
+                principalDue = principalDue.add(upcomingInstallment.getPenaltyDue());
+                interestDue = interestDue.add(upcomingInstallment.getInterestDue());
+                totalFeesDueWithMiscFee = totalFeesDueWithMiscFee.add(upcomingInstallment.getTotalFeeDueWithMiscFeeDue());
+                penaltyDue = penaltyDue.add(upcomingInstallment.getPenaltyDue());
+                
+                subTotal = upcomingInstallment.getPrincipalDue().add(upcomingInstallment.getInterestDue())
+                        .add(upcomingInstallment.getTotalFeesDueWithMiscFee()).add(upcomingInstallment.getPenaltyDue());
+            }
+            return new InstallmentDetailsDto(principalDue.toString(), interestDue.toString(),
+                    totalFeesDueWithMiscFee.toString(), penaltyDue.toString(), subTotal.toString());
+        }
+        String zero = new Money(currency).toString();
+        return new InstallmentDetailsDto(zero, zero, zero, zero, zero);
+    }
 
     private InstallmentDetailsDto getOverDueInstallmentDetails(
             final List<AccountActionDateEntity> overDueInstallmentList, final MifosCurrency currency) {
@@ -1545,6 +1612,26 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
             feesDue = feesDue.add(installment.getTotalFeeDueWithMiscFeeDue());
             penaltyDue = penaltyDue.add(installment.getPenaltyDue());
         }
+        Money subTotal = principalDue.add(interestDue).add(feesDue).add(penaltyDue);
+        return new InstallmentDetailsDto(principalDue.toString(), interestDue.toString(), feesDue.toString(), penaltyDue.toString(), subTotal.toString());
+    }
+    
+    //TODO
+    private InstallmentDetailsDto getOverDueInstallmentDetailsForGroupLoan(
+            final List<List<AccountActionDateEntity>> overDueInstallmentList, final MifosCurrency currency) {
+        Money principalDue = new Money(currency);
+        Money interestDue = new Money(currency);
+        Money feesDue = new Money(currency);
+        Money penaltyDue = new Money(currency);
+            for (List<AccountActionDateEntity> member : overDueInstallmentList) {
+                for (AccountActionDateEntity accountActionDate : member) {
+                    LoanScheduleEntity installment = (LoanScheduleEntity) accountActionDate;
+                    principalDue = principalDue.add(installment.getPrincipalDue());
+                    interestDue = interestDue.add(installment.getInterestDue());
+                    feesDue = feesDue.add(installment.getTotalFeeDueWithMiscFeeDue());
+                    penaltyDue = penaltyDue.add(installment.getPenaltyDue());
+                }
+            }
         Money subTotal = principalDue.add(interestDue).add(feesDue).add(penaltyDue);
         return new InstallmentDetailsDto(principalDue.toString(), interestDue.toString(), feesDue.toString(), penaltyDue.toString(), subTotal.toString());
     }
@@ -1581,21 +1668,18 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
             if (repayLoanInfoDto.isWaiveInterest() && !loan.isInterestWaived()) {
                 throw new BusinessRuleException(LoanConstants.WAIVER_INTEREST_NOT_CONFIGURED);
             }
-            Money earlyRepayAmount = new Money(loan.getCurrency(), repayLoanInfoDto.getEarlyRepayAmount());
-            loanBusinessService.computeExtraInterest(loan, repayLoanInfoDto.getDateOfPayment());
-            BigDecimal interestDueForCurrentInstallment =
-                    interestDueForNextInstallment(repayLoanInfoDto.getTotalRepaymentAmount(),
-                    repayLoanInfoDto.getWaivedAmount(),loan,repayLoanInfoDto.isWaiveInterest());
+            BigDecimal interestDueForCurrentInstallment = calculateInterestDueForCurrentInstalmanet(repayLoanInfoDto);
+            
+            org.mifos.dto.domain.AccountPaymentDto paymentDto = new org.mifos.dto.domain.AccountPaymentDto(Double.valueOf(repayLoanInfoDto.getEarlyRepayAmount()),
+                    repayLoanInfoDto.getDateOfPayment(), repayLoanInfoDto.getReceiptNumber(), repayLoanInfoDto.getReceiptDate(), repayLoanInfoDto.getId());
+            
             if (repayLoanInfoDto.getSavingsPaymentId() != null){
-                loan.makeEarlyRepayment(earlyRepayAmount, repayLoanInfoDto.getDateOfPayment(),
-                        repayLoanInfoDto.getReceiptNumber(), repayLoanInfoDto.getReceiptDate(),
-                        repayLoanInfoDto.getPaymentTypeId(), repayLoanInfoDto.getId(),
+                paymentDto.setMemberNumWithAmount(generateAmountWithInterest(null == repayLoanInfoDto.getMembersValue() ? new HashMap<String, Double>() : repayLoanInfoDto.getMembersValue(), repayLoanInfoDto));
+                loan.makeEarlyRepayment(paymentDto, repayLoanInfoDto.getId(),
                         repayLoanInfoDto.isWaiveInterest(), new Money(loan.getCurrency(), interestDueForCurrentInstallment),
-                        repayLoanInfoDto.getSavingsPaymentId());
+                        repayLoanInfoDto.getSavingsPaymentId(),null);
             } else {
-                loan.makeEarlyRepayment(earlyRepayAmount, repayLoanInfoDto.getDateOfPayment(),
-                        repayLoanInfoDto.getReceiptNumber(), repayLoanInfoDto.getReceiptDate(),
-                        repayLoanInfoDto.getPaymentTypeId(), repayLoanInfoDto.getId(),
+                loan.makeEarlyRepayment(paymentDto, repayLoanInfoDto.getId(),
                         repayLoanInfoDto.isWaiveInterest(), new Money(loan.getCurrency(), interestDueForCurrentInstallment));
             }
         } catch (AccountException e) {
@@ -1667,6 +1751,9 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
         UserContext userContext = new UserContextFactory().create(mifosUser);
 
         LoanBO loan = this.loanDao.findByGlobalAccountNum(globalAccountNum);
+        if (loan.isDecliningBalanceInterestRecalculation()) {
+            loanBusinessService.computeExtraInterest(loan, DateUtils.getCurrentDateWithoutTimeStamp());
+        }
 
         try {
             personnelDao.checkAccessPermission(userContext, loan.getOfficeId(), loan.getCustomer().getLoanOfficerId());
@@ -1756,15 +1843,15 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
                                      loan.getTotalAmountDue().toString(), loan.getTotalAmountInArrears().toString(), loanSummary,
                                      loan.getLoanActivityDetails().isEmpty()? false: true, loan.getInterestRate(),
                                      loan.isInterestDeductedAtDisbursement(),
-                                     loan.getLoanOffering().getLoanOfferingMeeting().getMeeting().getMeetingDetails().getRecurAfter(),
-                                     loan.getLoanOffering().getLoanOfferingMeeting().getMeeting().getMeetingDetails().getRecurrenceType().getRecurrenceId(),
+                                     loan.getLoanMeeting().getMeetingDetails().getRecurAfter(),
+                                     loan.getLoanMeeting().getMeetingDetails().getRecurrenceType().getRecurrenceId(),
                                      loan.getLoanOffering().isPrinDueLastInst(), loan.getNoOfInstallments(),
                                      loan.getMaxMinNoOfInstall().getMinNoOfInstall(), loan.getMaxMinNoOfInstall().getMaxNoOfInstall(),
                                      loan.getGracePeriodDuration(), fundName, loan.getCollateralTypeId(), collateralTypeName, loan.getCollateralNote(),loan.getExternalId(),
                                      accountFeesDtos, loan.getCreatedDate(), loanPerformanceHistory,
                                      loan.getCustomer().isGroup(), getRecentActivityView(globalAccountNum), activeSurveys, accountSurveys,
                                      loan.getCustomer().getDisplayName(), loan.getCustomer().getGlobalCustNum(), loan.getOffice().getOfficeName(), recentNoteDtos,
-                                     accountPenaltiesDtos);
+                                     accountPenaltiesDtos, AccountingRules.isGroupLoanWithMembers());
     }
 
     private String getMeetingRecurrence(MeetingBO meeting, UserContext userContext) {
@@ -2495,7 +2582,7 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
     }
 
     @Override
-    public List<CustomerSearchResultDto> retrieveCustomersThatQualifyForLoans(CustomerSearchDto customerSearchDto) {
+    public List<CustomerSearchResultDto> retrieveCustomersThatQualifyForLoans(CustomerSearchDto customerSearchDto, boolean isNewGLIMCreation) {
 
         MifosUser user = (MifosUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         UserContext userContext = toUserContext(user);
@@ -2503,7 +2590,7 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
         try {
             List<CustomerSearchResultDto> pagedDetails = new ArrayList<CustomerSearchResultDto>();
 
-            QueryResult customerForSavings = customerPersistence.searchGroupClient(customerSearchDto.getSearchTerm(), userContext.getId());
+            QueryResult customerForSavings = customerPersistence.searchGroupClient(customerSearchDto.getSearchTerm(), userContext.getId(), isNewGLIMCreation);
 
             int position = (customerSearchDto.getPage()-1) * customerSearchDto.getPageSize();
             List<AccountSearchResultsDto> pagedResults = customerForSavings.get(position, customerSearchDto.getPageSize());
@@ -2971,8 +3058,108 @@ public class LoanAccountServiceFacadeWebTier implements LoanAccountServiceFacade
         for (AccountPaymentEntity accountPaymentEntity : loanAccountPaymentsEntities){
             loanAccountPayments.add(accountPaymentEntity.toScreenDto());
         }
+        
+        //for new group loan accounts
+        if (loanAccount.isGroupLoanAccount() && null == loanAccount.getParentAccount()) {
+            for (LoanBO member : loanAccount.getMemberAccounts()) {
+                for (AccountPaymentEntity accPayment : member.getAccountPayments()) {
+                    if (!accPayment.isLoanDisbursment()) {
+                        loanAccountPayments.add(accPayment.toScreenDto());
+                    }
+                }
+            }
+            Collections.sort(loanAccountPayments, new AccountPaymentDtoComperator());
+            Collections.reverse(loanAccountPayments);
+        }
 
         return loanAccountPayments;
+    }
+
+    @Override
+    public Integer getGroupLoanType(String globalAccountNum) {
+        Integer loanType;
+        LoanBO loan = loanDao.findByGlobalAccountNum(globalAccountNum);
+        if (loan.isGroupLoanAccount() && null == loan.getParentAccount()) {
+            loanType = PARENT_LOAN;
+        }
+        else if (loan.isGroupLoanAccount()  && null != loan.getParentAccount()) {
+            loanType = MEMBER_LOAN;
+        }
+        else {
+            loanType = OTHER_LOAN;
+        }
+        return loanType;
+    }
+    
+    @Override
+    public void makeEarlyGroupRepayment(RepayLoanInfoDto repayLoanInfoDto, Map<String, Double> memberNumWithAmount) {
+       
+        MifosUser mifosUser = (MifosUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        UserContext userContext = new UserContextFactory().create(mifosUser);
+        
+        LoanBO parentLoan = this.loanDao.findByGlobalAccountNum(repayLoanInfoDto.getGlobalAccountNum());
+        
+        try {
+            personnelDao.checkAccessPermission(userContext, parentLoan.getOfficeId(), parentLoan.getCustomer().getLoanOfficerId());
+        } catch (AccountException e) {
+            throw new MifosRuntimeException(e.getMessage(), e);
+        }
+        monthClosingServiceFacade.validateTransactionDate(repayLoanInfoDto.getDateOfPayment());
+
+        if (!isTrxnDateValid(parentLoan.getAccountId(), repayLoanInfoDto.getDateOfPayment())) {
+            throw new BusinessRuleException("errors.invalidTxndate");
+        }
+        
+        try {
+                if (repayLoanInfoDto.isWaiveInterest() && !parentLoan.isInterestWaived()) {
+                    throw new BusinessRuleException(LoanConstants.WAIVER_INTEREST_NOT_CONFIGURED);
+                }
+                BigDecimal interestDueForCurrentInstallment = calculateInterestDueForCurrentInstalmanet(repayLoanInfoDto);
+                
+                org.mifos.dto.domain.AccountPaymentDto paymentDto = new org.mifos.dto.domain.AccountPaymentDto(repayLoanInfoDto.getTotalRepaymentAmount().doubleValue(),
+                        repayLoanInfoDto.getDateOfPayment(), repayLoanInfoDto.getReceiptNumber(), repayLoanInfoDto.getReceiptDate(), repayLoanInfoDto.getId(), generateAmountWithInterest(memberNumWithAmount,repayLoanInfoDto));
+                
+                if (repayLoanInfoDto.getSavingsPaymentId() != null){
+                    parentLoan.makeEarlyRepayment(paymentDto, repayLoanInfoDto.getId(),
+                            repayLoanInfoDto.isWaiveInterest(), new Money(parentLoan.getCurrency(), interestDueForCurrentInstallment),
+                            repayLoanInfoDto.getSavingsPaymentId(),null);
+                } else {
+                    parentLoan.makeEarlyRepayment(paymentDto, repayLoanInfoDto.getId(),
+                            repayLoanInfoDto.isWaiveInterest(), new Money(parentLoan.getCurrency(), interestDueForCurrentInstallment));
+                }
+            } catch (AccountException e) {
+                throw new BusinessRuleException(e.getKey(), e);
+        }
+        
+    }
+    
+    private Map<String, AmountWithInterest> generateAmountWithInterest(Map<String,Double> memberNumWithAmount, RepayLoanInfoDto parentRLIDto) {
+        Map<String, AmountWithInterest> awi = new HashMap<String, AmountWithInterest>();
+        
+        for (Map.Entry<String, Double> entry : memberNumWithAmount.entrySet()) {
+            LoanBO loan = this.loanDao.findById(Integer.valueOf(entry.getKey()));
+            String globalAccountNum = loan.getGlobalAccountNum();
+            RepayLoanDto memberRLDto = retrieveLoanRepaymentDetails(globalAccountNum);
+            RepayLoanInfoDto memberRLIDto = new RepayLoanInfoDto(globalAccountNum, memberRLDto.getEarlyRepaymentMoney(), parentRLIDto.getReceiptNumber(), parentRLIDto.getReceiptDate(),
+                    parentRLIDto.getPaymentTypeId(), parentRLIDto.getId(), parentRLIDto.isWaiveInterest(), parentRLIDto.getDateOfPayment(), new BigDecimal(entry.getValue()), new BigDecimal(memberRLDto.getWaivedRepaymentMoney()));
+            awi.put(entry.getKey(), new org.mifos.dto.domain.AccountPaymentDto.AmountWithInterest(entry.getValue(), calculateInterestDueForCurrentInstalmanet(memberRLIDto)));
+        }
+        return awi;
+    }
+    
+    @Override
+    public BigDecimal calculateInterestDueForCurrentInstalmanet(RepayLoanInfoDto repayLoanInfoDto) {
+        LoanBO loan = this.loanDao.findByGlobalAccountNum(repayLoanInfoDto.getGlobalAccountNum());
+        loanBusinessService.computeExtraInterest(loan, repayLoanInfoDto.getDateOfPayment());
+        BigDecimal interestDueForCurrentInstallment =
+                interestDueForNextInstallment(repayLoanInfoDto.getTotalRepaymentAmount(),
+                repayLoanInfoDto.getWaivedAmount(),loan,repayLoanInfoDto.isWaiveInterest());
+        return interestDueForCurrentInstallment;
+    }
+    
+    @Override
+    public void uploadFile(Integer accountId, InputStream in, UploadedFileDto uploadedFileDto) {
+        loanFileService.create(accountId, in, uploadedFileDto);
     }
 
 }

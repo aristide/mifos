@@ -74,7 +74,7 @@
     </div>
 </div>
 <br />
-[#if loanProductReferenceData.glimApplicable]
+[#if loanProductReferenceData.glimApplicable || (loanProductReferenceData.group && loanProductReferenceData.groupLoanWithMembersEnabled)]
 <table style="margin-bottom: 15px;">
 		<thead>
 		<tr>
@@ -273,6 +273,17 @@
        </div>
     </div>
     [/#list]
+    <div class="row">
+        <b>[@spring.message "client.Attachements" /]</b>
+    </div>
+    <ol id="filesToUpload">
+            [#list loanAccountFormBean.filesMetadata as fileMetadata]
+                <li id="${fileMetadata.name}">
+                    <b>${fileMetadata.name}</b><br/>
+                    ${fileMetadata.description}<br/>
+                </li>
+            [/#list]
+     </ol>
 <!-- end of product summary -->
 </div>
 [#if index > 0]

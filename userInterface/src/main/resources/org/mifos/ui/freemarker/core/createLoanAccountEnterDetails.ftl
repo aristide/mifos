@@ -105,14 +105,14 @@
 <br/>
 <br/>
 
-[#if loanProductReferenceData.glimApplicable]
+[#if loanProductReferenceData.glimApplicable || (loanProductReferenceData.group && loanProductReferenceData.groupLoanWithMembersEnabled)]
 <p><span class="standout">[@spring.message "createLoanAccount.enterAccountInfo.accountDetail.glim.individualdetails.header" /]</span></p>
 [#else]
 <p><span class="standout">[@spring.message "createLoanAccount.enterAccountInfo.accountDetail.header" /]</span></p>
 [/#if]
-<form action="${flowExecutionUrl}" method="post" class="two-columns">
+<form action="${flowExecutionUrl}" method="post" class="two-columns" enctype="multipart/form-data">
     <fieldset>
-    [#if loanProductReferenceData.glimApplicable]
+    [#if loanProductReferenceData.glimApplicable || (loanProductReferenceData.group && loanProductReferenceData.groupLoanWithMembersEnabled)]
     <script type="text/javascript">
     	function calculateTotalLoanAmount() {
     		$(document).ready(function () {
@@ -231,6 +231,8 @@
 	    		<span>[@spring.message "manageLoanProducts.defineLoanProduct.week(s)"/]</span>
 	    		<input type="radio" id="loancreationdetails.input.frequencyMonths" name="repaymentFrequency" disabled=disabled/>
 	    		<span>[@spring.message "manageLoanProducts.defineLoanProduct.month(s)"/]</span>
+	    		<input type="radio" id="loancreationdetails.input.frequencyDays" name="repaymentFrequency" disabled=disabled/>
+	    		<span>[@spring.message "manageLoanProducts.defineLoanProduct.day(s)"/]</span>
 		    	<div id="week" id="weekDIV" style="margin-left: 306px; margin-bottom: 5px; margin-top: 5px; border: 1px solid grey; padding-left: 4px;">
 		    		<div style="margin-top: 2px; margin-bottom: 2px;">[@spring.message "manageLoanProducts.defineLoanProduct.ifweeks,specifythefollowing" /]</div>
 			        [@spring.message "manageLoanProducts.defineLoanProduct.recurevery" /]
@@ -239,12 +241,15 @@
 			        [@form.singleSelectWithPrompt path="loanAccountFormBean.repaymentDayOfWeek" options=loanProductReferenceData.daysOfTheWeekOptions id="weekDay" /]
 		    	</div>
     		</div>
-    		[#else]
+    		[/#if]
+    		[#if loanProductReferenceData.loanOfferingMeetingDetail.meetingDetailsDto.recurrenceTypeId == 2]
     		<div class="row">
-	    		<input type="radio" id="loancreationdetails.input.frequencyWeeks" name="repaymentFrequency" disabled=disabled />
+	    		<input type="radio" id="loancreationdetails.input.frequencyWeeks" name="repaymentFrequency" checked=checked />
 	    		<span>[@spring.message "manageLoanProducts.defineLoanProduct.week(s)"/]</span>
-	    		<input type="radio" id="loancreationdetails.input.frequencyMonths" name="repaymentFrequency" checked=checked />
+	    		<input type="radio" id="loancreationdetails.input.frequencyMonths" name="repaymentFrequency" disabled=disabled/>
 	    		<span>[@spring.message "manageLoanProducts.defineLoanProduct.month(s)"/]</span>
+	    		<input type="radio" id="loancreationdetails.input.frequencyDays" name="repaymentFrequency" disabled=disabled/>
+	    		<span>[@spring.message "manageLoanProducts.defineLoanProduct.day(s)"/]</span>
 	    		<div id="montlycontainer" style="margin-left: 306px; margin-bottom: 5px; margin-top: 5px; border: 1px solid grey; padding-left: 4px;">
 			    	<div id="monthlyoption1">
 			    		<div style="margin-top: 2px; margin-bottom: 2px;">[@spring.message "manageLoanProducts.defineLoanProduct.ifmonths,specifythefollowing" /]</div>
@@ -276,6 +281,22 @@
 			    	</div>
 			    </div>
 	    	</div>
+    		[/#if]
+    		[#if loanProductReferenceData.loanOfferingMeetingDetail.meetingDetailsDto.recurrenceTypeId == 3]
+    		<div class="row">
+	    		<input type="radio" id="loancreationdetails.input.frequencyWeeks" name="repaymentFrequency" disabled=disabled />
+	    		<span>[@spring.message "manageLoanProducts.defineLoanProduct.week(s)"/]</span>
+	    		<input type="radio" id="loancreationdetails.input.frequencyMonths" name="repaymentFrequency" disabled=disabled/>
+	    		<span>[@spring.message "manageLoanProducts.defineLoanProduct.month(s)"/]</span>
+	    		<input type="radio" id="loancreationdetails.input.frequencyDays" name="repaymentFrequency" checked=checked/>
+	    		<span>[@spring.message "manageLoanProducts.defineLoanProduct.day(s)"/]</span>
+		    	<div id="day" id="dayDIV" style="margin-left: 306px; margin-bottom: 5px; margin-top: 5px; border: 1px solid grey; padding-left: 4px;">
+		    		<div style="margin-top: 2px; margin-bottom: 2px;">[@spring.message "manageLoanProducts.defineLoanProduct.ifdays,specifythefollowing" /]</div>
+			        [@spring.message "manageLoanProducts.defineLoanProduct.recurevery" /]
+			        [@form.input path="loanAccountFormBean.repaymentRecursEvery" id="loancreationdetails.input.dayFrequency" attributes="size=3 maxlength=2"/]
+			        <span id="dayLabelMessage">[@spring.message "manageLoanProducts.defineLoanProduct.day(s)" /]</span>
+		    	</div>
+    		</div>
     		[/#if]
     [/#if]
     
@@ -418,7 +439,38 @@
 	    	[@form.input path="loanAccountFormBean.selectedFeeAmount[2]" id="selectedFeeId2Amount" attributes="style='margin-left: 20px;' class='separatedNumber'"/]
 	    </div>
 	</div>
+	<div class="clear"/>  
+	<br/>
+
+    <p><div class="standout" id="attachements">[@spring.message "client.Attachements" /] ( [@spring.message "upload.maxUploadSize" /] 2 MB )</div></p>
+    <div class="attachements">
+        <div class="row">
+        [@form.label "selecttedFileLabel" false][@spring.message "upload.file" /][/@form.label]
+        [@spring.bind "loanAccountFormBean.selectedFile" /]
+        [@form.input path="loanAccountFormBean.selectedFile" fieldType="file" id="selectedFile"  /]
+        </div>
+        <div class="row">
+            [@form.label "selecttedFileDescriptionLabel" false][@spring.message "Description" /][/@form.label]
+            [@form.input path="loanAccountFormBean.selectedFileDescription" id="selectedFileDescription" attributes="maxlength='60' size='40'" /]
+        </div>
+        <div class="row">
+            [@form.simpleButton label="upload.addFile" id="addFileButton" webflowEvent="newFileSelected" attributes="style='margin-left: 305px;'"/]
+            <div class="clear"/>  
+            <br/>
+        </div>
+        <ol id="filesToUpload" style='margin-left: 305px;'>
+            [#list loanAccountFormBean.filesMetadata as fileMetadata]
+                <li id="${fileMetadata.name}">
+                    <b>${fileMetadata.name}</b><br/>
+                    ${fileMetadata.description}<br/>
+                    <input type="button" class="delete-file-button" value="X" />
+                    <br/><br/>
+                </li>
+            [/#list]
+        </ol>
+    </div>
     </fieldset>
+    
     <div class="row webflow-controls">
         [@form.submitButton label="widget.form.buttonLabel.continue" id="loancreationdetails.button.continue" webflowEvent="detailsEntered" /]
         [@form.cancelButton label="widget.form.buttonLabel.cancel" webflowEvent="cancel" /]
@@ -427,6 +479,7 @@
     [#list loanProductReferenceData.additionalFees as additionalFee]
     	<input type="hidden" id="hiddenFeeAmount${additionalFee.id}" value="${additionalFee.amountOrRate?string.number}" />
     [/#list]
+        <input type="hidden" id="flowExecutionUrl" value="${flowExecutionUrl}" />
 </form>
 
 <script type="text/javascript">
@@ -486,6 +539,22 @@ $(document).ready(function() {
                 }
            });
     });
+    
+    $('#addFileButton').click(function(){
+       var file = document.getElementById("selectedFile");
+       var description = document.getElementById("selectedFileDescription");
+       if (file.value != null && file.value != "" && !document.getElementById(file.value)) {
+           $(this).closest('form').attr("action", $('#flowExecutionUrl').val() + "&_eventId=newFileSelected#attachements");
+           $(this).closest('form').submit();
+       }
+    });
+    
+    $('.delete-file-button').click(function(){
+        var fileName = $(this).closest('li').attr('id');
+        $(this).closest('form').attr("action", $('#flowExecutionUrl').val() + "&_eventId=fileDeleted&fileToDelete=" + fileName + "#attachements");
+        $(this).closest('form').submit();
+    });
+    
 });
 </script>
 

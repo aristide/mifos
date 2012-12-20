@@ -87,6 +87,7 @@ public interface MeetingConstants {
 
     String CUSTOMER = "Customer";
 
+    String DAY_SCHEDULE = "meeting.everyDaySchedule";
     String WEEK_SCHEDULE = "meeting.weekSchedule";
     String MONTH_DAY_SCHEDULE = "meeting.daySchedule";
     String MONTH_SCHEDULE = "meeting.monthSchedule";
@@ -117,4 +118,8 @@ public interface MeetingConstants {
 
     String NOT_SUPPORTED_FREQUENCY_TYPE = "errors.not_supported_frequencytype";
 
+    String INVALID_DAY_OF_WEEK_FOR_START_DATE = "errors.Meeting.invalidDayOfWeekForMeetingStartDate";
+    String INVALID_DAY_OF_MONTH_FOR_START_DATE = "errors.Meeting.invalidDayOfMonthForMeetingStartDate";
+
+    String INVALID_WEEK_FOR_START_DATE = "errors.Meeting.invalidWeekForMeetingStartDate";
 }

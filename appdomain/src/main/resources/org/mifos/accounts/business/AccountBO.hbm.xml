@@ -165,7 +165,7 @@
                 class="org.mifos.accounts.loan.business.LoanBO" not-null="false">
             </many-to-one>
 
-            <set name="memberAccounts" cascade="all" lazy="true" access="field">
+            <set name="memberAccounts" cascade="all" lazy="true" access="field" order-by="account_id asc">
                 <key column="parent_account_id" />
                 <one-to-many class="org.mifos.accounts.loan.business.LoanBO"></one-to-many>
             </set>
@@ -175,7 +175,6 @@
                 type="org.mifos.application.meeting.util.helpers.WeekDayUserType" />
             <property name="monthRank" column="month_rank"
                 type="org.mifos.application.meeting.util.helpers.RankOfDayUserType" />
-
         </joined-subclass>
         <!-- This is for savings account-->
         <joined-subclass name="org.mifos.accounts.savings.business.SavingsBO"
@@ -588,7 +587,8 @@ having max(cs.installment_id) > max(cfs.installment_id)
         from org.mifos.accounts.business.AccountBO account
         left join account.customer
         where account.customer.customerId=:customerId
-        and (account.accountType.accountTypeId=:loanAccountTypeId or account.accountType.accountTypeId=:savingsAccountTypeId)
+        and (account.accountType.accountTypeId=:loanAccountTypeId or account.accountType.accountTypeId=:savingsAccountTypeId
+        or account.accountType.accountTypeId=:groupLoanAccountTypeId)
         and account.globalAccountNum=:searchString ]]>
     </query>
 
@@ -1048,6 +1048,139 @@ select coll.*,
             and account.parentAccount.accountState.id in (3,4,5,9)
     		group by account.parentAccount
             order by account.parentAccount.id
+        ]]>
+    </query>
+    <query name="LoanBO.getMemberDetails">
+        <![CDATA[from org.mifos.accounts.loan.business.LoanBO account 
+            where account.parentAccount.accountId=:ACCOUNT_ID
+        ]]>
+    </query>
+    
+    
+    <query name="loan.getAllBadStandingLoans">
+        <![CDATA[ 
+                from org.mifos.accounts.loan.business.LoanBO loan 
+                WHERE loan.accountState.description = 'Active in bad standing'
+                GROUP BY loan.accountId
+        ]]>
+    </query>
+    
+    <query name="loan.getAllLoansToBePaidCurrentWeek">
+        <![CDATA[Select loan from org.mifos.accounts.loan.business.LoanBO loan 
+                 left join loan.accountActionDates actionDates
+                 WHERE actionDates.actionDate BETWEEN :START_DATE AND :END_DATE 
+                 AND loan.parentAccount is null AND loan.accountState.id in (5,9)
+                 GROUP BY loan.accountId
+
+        ]]>
+    </query>
+    
+     <query name="loan.getAllWaitingForApprovalLoans">
+    <![CDATA[
+                from org.mifos.accounts.loan.business.LoanBO loan 
+                WHERE loan.accountState.description = 'Application pending approval'
+                AND loan.parentAccount is null
+                GROUP BY loan.accountId
+        ]]>
+    </query> 
+    
+    <query name="loan.getBadStandingLoansUnderLoanOfficer">
+        <![CDATA[ 
+                from org.mifos.accounts.loan.business.LoanBO loan 
+                WHERE loan.accountState.description = 'Active in bad standing'
+                AND loan.personnel.personnelId=:ID
+                GROUP BY loan.accountId
+        ]]>
+    </query>
+    
+    <query name="loan.getLoansToBePaidCurrentWeekUnderLoanOfficer">
+        <![CDATA[Select loan from org.mifos.accounts.loan.business.LoanBO loan 
+                 left join loan.accountActionDates actionDates
+                 WHERE actionDates.actionDate BETWEEN :START_DATE AND :END_DATE 
+                 AND loan.parentAccount is null AND loan.personnel.personnelId=:ID
+                 AND loan.accountState.id in (5,9)
+                 GROUP BY loan.accountId
+        ]]>
+    </query>
+    
+     <query name="loan.getWaitingForApprovalLoansUnderLoanOfficer">
+    <![CDATA[
+                from org.mifos.accounts.loan.business.LoanBO loan 
+                WHERE loan.accountState.description = 'Application pending approval'
+                AND loan.parentAccount is null AND loan.personnel.personnelId=:ID
+                GROUP BY loan.accountId
+        ]]>
+    </query>  
+    
+    <sql-query name="loan.countAllBadStandingLoans">
+        <![CDATA[ SELECT count(*)
+                FROM account a 
+                inner join loan_account l on a.account_id = l.account_id 
+                WHERE a.account_state_id=9 and l.parent_account_id is null;
+        ]]>
+    </sql-query>
+    
+    <sql-query name="loan.countAllLoansToBePaidCurrentWeek">
+        <![CDATA[SELECT count(distinct a.account_id) FROM
+                loan_account a
+                inner join loan_schedule s on a.account_id = s.account_id
+                inner join account acc on acc.account_id = a.account_id
+                WHERE s.action_date BETWEEN :START_DATE AND :END_DATE 
+                AND a.parent_account_id is null
+                AND acc.account_state_id in (5,9)
+        ]]>
+    </sql-query>
+    
+     <sql-query name="loan.countAllWaitingForApprovalLoans">
+        <![CDATA[SELECT count(*)
+                FROM account a 
+                inner join loan_account l on a.account_id = l.account_id 
+                WHERE a.account_state_id=2 and l.parent_account_id is null;
+        ]]>
+    </sql-query> 
+    
+    <sql-query name="loan.countBadStandingLoansUnderLoanOfficer">
+        <![CDATA[ SELECT count(*)
+                FROM account a 
+                inner join loan_account l on a.account_id = l.account_id 
+                WHERE a.account_state_id=9 and l.parent_account_id is null
+                AND a.personnel_id=:ID
+        ]]>
+    </sql-query>
+    
+    <sql-query name="loan.countLoansToBePaidCurrentWeekLoansUnderLoanOfficer">
+        <![CDATA[SELECT count(distinct a.account_id) FROM
+                loan_account a
+                inner join loan_schedule s on a.account_id = s.account_id
+                inner join account acc on acc.account_id = a.account_id
+                WHERE s.action_date BETWEEN :START_DATE AND :END_DATE 
+                AND a.parent_account_id is null AND acc.personnel_id=:ID
+                AND acc.account_state_id in (5,9)
+        ]]>
+    </sql-query>
+    
+     <sql-query name="loan.countWaitingForApprovalLoansLoansUnderLoanOfficer">
+        <![CDATA[SELECT count(*)
+                FROM account a 
+                inner join loan_account l on a.account_id = l.account_id 
+                WHERE a.account_state_id=2 and l.parent_account_id is null
+                AND a.personnel_id=:ID
+        ]]>
+    </sql-query>  
+    
+    <query name="Loan.getLoanUploadedFile">
+        <![CDATA[
+            from LoanFileEntity lf where lf.fileId=:fileId
+        ]]>
+    </query>
+    <query name="Loan.getLoanAllUploadedFiles">
+        <![CDATA[
+            from LoanFileEntity lf where lf.loanId=:loanId order by lf.fileInfo.uploadDate desc
+        ]]>
+    </query>
+    <query name="Loan.getLoanUploadedFileByName">
+        <![CDATA[
+            from LoanFileEntity lf join lf.fileInfo where lf.loanId = :loanId and lf.fileInfo.name=:fileName
         ]]>
     </query>
     

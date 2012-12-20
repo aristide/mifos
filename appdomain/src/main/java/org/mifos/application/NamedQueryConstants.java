@@ -72,9 +72,22 @@ public interface NamedQueryConstants {
     String PRDSRCFUNDS = "product.srcfund";
 
     // for Loan accounts
+    String GET_ALL_LOANS_TO_BE_PAID_CURRENT_WEEK ="loan.getAllLoansToBePaidCurrentWeek";
+    String GET_LOANS_TO_BE_PAID_CURRENT_WEEK_UNDER_LOANOFF ="loan.getLoansToBePaidCurrentWeekUnderLoanOfficer";
     String GET_COSIGNING_CLIENTS_FOR_GLIM = "loan.getCosigningLoansOfClientsForGlim";
+    String GET_ALL_WAITING_FOR_APPROVAL_LOANS = "loan.getAllWaitingForApprovalLoans";
+    String GET_ALL_BAD_STANDING_LOANS = "loan.getAllBadStandingLoans";
+    String GET_WAITING_FOR_APPROVAL_LOANS_UNDER_LOANOFF = "loan.getWaitingForApprovalLoansUnderLoanOfficer";
+    String GET_BAD_STANDING_LOANS_UNDER_LOANOFF = "loan.getBadStandingLoansUnderLoanOfficer";
     String RETRIEVE_TOTAL_LOAN_FOR_CUSTOMER = "loan.retrieveTotalLoanForCustomer";
 
+    String COUNT_ALL_LOANS_TO_BE_PAID_CURRENT_WEEK ="loan.countAllLoansToBePaidCurrentWeek";
+    String COUNT_ALL_WAITING_FOR_APPROVAL_LOANS = "loan.countAllWaitingForApprovalLoans";
+    String COUNT_ALL_BAD_STANDING_LOANS = "loan.countAllBadStandingLoans";
+    String COUNT_LOANS_TO_BE_PAID_CURRENT_WEEK_UNDER_LOANOFF ="loan.countLoansToBePaidCurrentWeekLoansUnderLoanOfficer";
+    String COUNT_WAITING_FOR_APPROVAL_LOANS_UNDER_LOANOFF = "loan.countWaitingForApprovalLoansLoansUnderLoanOfficer";
+    String COUNT_BAD_STANDING_LOANS_UNDER_LOANOFF = "loan.countBadStandingLoansUnderLoanOfficer";
+    
     // for Savings accounts
     String RETRIEVE_TOTAL_SAVINGS_FOR_CUSTOMER = "savings.retrieveTotalSavingsForCustomer";
 
@@ -85,6 +98,20 @@ public interface NamedQueryConstants {
     String ACCOUNT_GETALLLOANBYCUSTOMER = "accounts.GetAllLoanByCustomer";
 
     // for Customer Search
+    String GET_ALL_BORROWERS = "Customer.getAllBorrowers";
+    String GET_ALL_BORROWERS_GROUP = "Customer.getAllBorrowersGroup";
+    String GET_ALL_ACTIVE_CLIENTS = "Customer.getAllActiveClients";
+    String GET_ALL_ACTIVE_GROUPS = "Customer.getAllActiveGroups";
+    String GET_ALL_ACTIVE_CENTERS = "Customer.getAllActiveCenters";
+    String GET_ACTIVE_CLIENTS_UNDER_LOANOFF = "Customer.getActiveClientsUnderLoanOff";
+    String GET_ACTIVE_GROUPS_UNDER_LOANOFF = "Customer.getActiveGroupsUnderLoanOff";
+    String GET_ACTIVE_CENTERS_UNDER_LOANOFF = "Customer.getActiveCentersUnderLoanOff";
+    String COUNT_ALL_BORROWERS = "Customer.countAllBorrowers";
+    String COUNT_ALL_BORROWERS_GROUP = "Customer.countAllBorrowersGroup";
+    String GET_BORROWERS_UNDER_LOANOFF = "Customer.getBorrowersUnderLoanOfficerID";
+    String GET_BORROWERS_GROUP_UNDER_LOANOFF = "Customer.getBorrowersGroupUnderLoanOfficerID";
+    String COUNT_BORROWERS_UNDER_LOANOFF = "Customer.countBorrowersUnderLoanOfficerID";
+    String COUNT_BORROWERS_GROUP_UNDER_LOANOFF = "Customer.countBorrowersGroupUnderLoanOfficerID";
     String GET_ACTIVE_CLIENTS_COUNT_UNDER_OFFICE = "Customer.getActiveClientsCountUnderOffice";
     String GET_ACTIVE_OR_HOLD_CLIENTS_COUNT_UNDER_OFFICE = "Customer.getActiveOrHoldClientsCountUnderOffice";
     String GET_VERY_POOR_ACTIVE_OR_HOLD_CLIENTS_COUNT_UNDER_OFFICE = "Customer.getVeryPoorActiveOrHoldClientsCountUnderOffice";
@@ -103,7 +130,8 @@ public interface NamedQueryConstants {
     String GET_VERY_POOR_DROP_OUT_CLIENTS_COUNT_UNDER_OFFICE = "Customers.getVeryPoorDropOutClientsCountUnderOffice";
     String GET_ON_HOLD_CLIENTS_COUNT_UNDER_OFFICE = "Customers.getOnHoldClientsCountUnderOffice";
     String GET_VERY_POOR_ON_HOLD_CLIENTS_COUNT_UNDER_OFFICE = "Customers.getVeryPoorOnHoldClientsCountUnderOffice";
-
+    String GET_ACTION_DATES_FOR_CUSTOMER = "Customer.getActionDatesForCustomer";
+    
     // Apply Adjustment
     String RETRIEVE_MAX_ACCPAYMENT = "accountPayment.maxAccPayment";
     String RETRIEVE_ALL_ACCPAYMENT = "accountPayment.allAccPayment";
@@ -151,6 +179,12 @@ public interface NamedQueryConstants {
     String GET_LOAN_SUMMARY_CURRENCIES_FOR_GROUP = "Customer.getLoanSummaryCurrenciesForGroup";
     String GET_TOTAL_AMOUNT_FOR_ALL_CLIENTS_OF_GROUP = "Customer.getTotalAmountForAllClientsOfGroup";
     String GET_ALL_BASIC_GROUP_INFO = "Customer.getAllBasicGroupInfo";
+    String GET_CLIENT_UPLOADED_FILE = "Customer.getClientUploadedFile";
+    String GET_CLIENT_ALL_UPLOADED_FILES = "Customer.getClientAllUploadedFiles";
+    String GET_CLIENT_UPLOADED_FILE_BY_NAME = "Customer.getClientUploadedFileByName";
+    String GET_LOAN_UPLOADED_FILE = "Loan.getLoanUploadedFile";
+    String GET_LOAN_ALL_UPLOADED_FILES = "Loan.getLoanAllUploadedFiles";
+    String GET_LOAN_UPLOADED_FILE_BY_NAME = "Loan.getLoanUploadedFileByName";
 
     /* Office Queries */
     String OFFICE_GET_SEARCHID = "office.getOfficeSearchId";
@@ -383,6 +417,9 @@ public interface NamedQueryConstants {
     String SEARCH_GROUPS_FOR_LOAN_OFFICER = "Customer.get_loanofficer_groups";
     String GET_ACTIVE_LOAN_OFFICER_UNDER_USER = "get_active_loanofficers_under_office";
     String GET_ACTIVE_BRANCHES = "get_active_offices";
+    String SEARCH_GROUP_FOR_GROUP_LOAN_COUNT = "Customer.count_group_for_account";
+    String SEARCH_GROUP_FOR_GROUP_LOAN = "Customer.group_account_Search";
+
 
     String RETRIEVE_AUDIT_LOG_RECORD = "retrieveAuditLogRecords";
 
@@ -410,6 +447,7 @@ public interface NamedQueryConstants {
     String GET_REPAYMENT_RULE_TYPES = "holiday.getRepaymentRuleLabels";
     String GET_REPAYMENT_RULE = "holiday.getRepaymentRule";
     String SAVING_SCHEDULE_GET_SCHEDULE_FOR_IDS = "savingsScheduleEntity.getScheduleForIds";
+    String SAVING_SCHEDULE_GET_ALL_CUSTOMER_SCHEDULES = "savingsScheduleEntity.getAllCustomerSchedules";
     String LOAN_SCHEDULE_GET_SCHEDULE_FOR_IDS = "loanScheduleEntity.getScheduleForIds";
     String GET_HOLIDAYS_BY_FLAG = "holiday.getHoildaysByFlag";
 
@@ -448,6 +486,7 @@ public interface NamedQueryConstants {
     String GET_TOP_LEVEL_ACCOUNTS = "COABO.getTopLevelAccounts";
     String GET_ACCOUNT_ID_FOR_GL_CODE = "COABO.getAccountIdForGLCode";
     String GET_ALL_COA = "COABO.getAllCoa";
+    String GET_CHILD_ACCOUNTS =  "COABO.getChildAccounts";
 
     // Administrative documents
 
@@ -515,4 +554,11 @@ public interface NamedQueryConstants {
 
     // Payment types
     String GET_TRANSFER_PAYMENT_TYPE_ID = "paymentType.getTransferId";
+    
+    // COA
+    String COUNT_GL_CODE_REFERENCES = "COABO.countGLCodes";
+    String REMOVE_COA_PARENT = "COABO.removeCOAparent";
+    String REMOVE_COA = "COABO.removeCOA";
+    String REMOVE_GLCODE = "COABO.removeGlCode";
+    String SET_COA_PARENT = "COA.updateParent";
 }

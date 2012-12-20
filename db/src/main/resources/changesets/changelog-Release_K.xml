@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-2.0.xsd">
+    <changeSet id="MIFOS-5739" author="Pawel Reise" context="expansion">
+        <sql endDelimiter=";">
+            create table file_info (
+                file_info_id bigint auto_increment not null,
+                name varchar(255) not null,
+                content_type varchar(255) not null,
+                size integer not null,
+                description text,
+                upload_date datetime not null,
+                primary key(file_info_id)
+            ) engine=innodb character set utf8;
+            create table client_file (
+                file_id bigint auto_increment not null,
+                client_id integer,
+                file_info bigint,
+                primary key(file_id),
+                foreign key(file_info)
+                    references file_info(file_info_id),
+                foreign key(client_id)
+                    references customer(customer_id)
+            ) engine=innodb character set utf8;
+        </sql>
+        <rollback>
+            drop table client_file;
+            drop table file_info;
+        </rollback>
+    </changeSet>
+    <changeSet id="MIFOS-5739_2" author="Pawel Reise" context="expansion">
+        <sql endDelimiter=";">
+            create table loan_file (
+                file_id bigint auto_increment not null,
+                loan_id integer,
+                file_info bigint,
+                primary key(file_id),
+                foreign key(file_info)
+                    references file_info(file_info_id),
+                foreign key(loan_id)
+                    references account(account_id)
+            ) engine=innodb character set utf8;
+        </sql>
+        <rollback>
+            drop table loan_file;
+        </rollback>
+    </changeSet>
+   <changeSet id="MIFOS-5712" author="Wojciech Szarmacher" context="expansion">
+       <sql endDelimiter=";">
+            insert into lookup_value(lookup_id,entity_id,lookup_name) values((select max(lv.lookup_id)+1 from
+                lookup_value lv), 87, 'Permissions-CanModifyChartOfAccounts');
+                
+            insert into lookup_value_locale(locale_id,lookup_id,lookup_value) values
+                (1,(select lookup_id from lookup_value where entity_id =87 and
+                lookup_name='Permissions-CanModifyChartOfAccounts'),null); 
+                
+            insert into activity(activity_id,parent_id, activity_name_lookup_id, DESCRIPTION_lookup_id) 
+                values(300,203,(select lookup_id from lookup_value where entity_id =87 and
+                lookup_name='Permissions-CanModifyChartOfAccounts'),
+                (select lookup_id from lookup_value where entity_id =87 and
+                lookup_name='Permissions-CanModifyChartOfAccounts'));
+                
+            insert into roles_activity(activity_id, role_id) values(300, 1);          
+       </sql>
+       <rollback>
+           <sql endDelimiter=";">
+                delete from roles_activity where activity_id = 300 or activity_id in (select activity_id from activity where parent_id = 300);
+                
+                delete from activity where parent_id = 300 or activity_id = 300;
+                
+                delete from lookup_value_locale where lookup_id =
+                    (select lookup_id from lookup_value
+                    where lookup_name='Permissions-CanModifyChartOfAccounts');
+
+                delete from lookup_value where entity_id = 87 and lookup_name =
+                    'Permissions-CanModifyChartOfAccounts';
+           </sql>
+       </rollback>
+   </changeSet>
+</databaseChangeLog>

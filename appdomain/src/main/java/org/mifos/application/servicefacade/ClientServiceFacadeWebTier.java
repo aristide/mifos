@@ -20,6 +20,7 @@
 
 package org.mifos.application.servicefacade;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -105,8 +106,10 @@ import org.mifos.dto.screen.ClientPersonalInfoDto;
 import org.mifos.dto.screen.ClientPhotoDto;
 import org.mifos.dto.screen.ClientRemovalFromGroupDto;
 import org.mifos.dto.screen.LoanCycleCounter;
+import org.mifos.dto.screen.UploadedFileDto;
 import org.mifos.framework.business.util.Address;
 import org.mifos.framework.exceptions.PageExpiredException;
+import org.mifos.framework.fileupload.service.ClientFileService;
 import org.mifos.framework.image.domain.ClientPhoto;
 import org.mifos.framework.image.service.ClientPhotoService;
 import org.mifos.framework.util.DateTimeService;
@@ -133,6 +136,9 @@ public class ClientServiceFacadeWebTier implements ClientServiceFacade {
 
     @Autowired
     private SavingsProductDao savingsProductDao;
+    
+    @Autowired
+    private ClientFileService clientFileService;
 
     @Autowired
     public ClientServiceFacadeWebTier(CustomerService customerService, OfficeDao officeDao,
@@ -493,6 +499,8 @@ public class ClientServiceFacadeWebTier implements ClientServiceFacade {
         List<CustomerFlagDto> customerFlags = customerDao.getCustomerFlagDto(client.getCustomerFlags());
 
         List<LoanDetailDto> loanDetail = customerDao.getLoanDetailDto(client.getOpenLoanAccounts());
+        
+        List<LoanDetailDto> groupLoanDetail = customerDao.getLoanDetailDto(client.getOpenGroupLoanAccounts());
 
         List<SavingsDetailDto> savingsDetail = customerDao.getSavingsDetailDto(clientId, userContext);
 
@@ -522,7 +530,7 @@ public class ClientServiceFacadeWebTier implements ClientServiceFacade {
         List<SurveyDto> customerSurveys = new ArrayList<SurveyDto>();
 
         return new ClientInformationDto(clientDisplay, customerAccountSummary, clientPerformanceHistory, clientAddress,
-                recentCustomerNotes, customerFlags, loanDetail, savingsDetail, customerMeeting, activeSurveys, customerSurveys,
+                recentCustomerNotes, customerFlags, loanDetail, groupLoanDetail, savingsDetail, customerMeeting, activeSurveys, customerSurveys,
                 closedLoanAccounts, closedSavingsAccounts);
     }
 
@@ -785,6 +793,10 @@ public class ClientServiceFacadeWebTier implements ClientServiceFacade {
         Long contentLength = clientPhoto.getImageInfo().getLength();
         byte[] out = clientPhotoService.getData(clientPhoto);
         return new ClientPhotoDto(contentType, contentLength, out);
+    }
+    
+    public void uploadFile(Integer clientId, InputStream in, UploadedFileDto uploadedFileDto) {
+        clientFileService.create(clientId, in, uploadedFileDto);
     }
 
     /**

@@ -20,6 +20,8 @@
 
 package org.mifos.clientportfolio.loan.ui;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,15 +33,13 @@ import org.joda.time.LocalDate;
 import org.mifos.application.admin.servicefacade.AdminServiceFacade;
 import org.mifos.application.servicefacade.LoanAccountServiceFacade;
 import org.mifos.clientportfolio.loan.service.CreateLoanSchedule;
-import org.mifos.clientportfolio.loan.service.MonthlyOnDayOfMonthSchedule;
-import org.mifos.clientportfolio.loan.service.MonthlyOnWeekOfMonthSchedule;
 import org.mifos.clientportfolio.loan.service.RecurringSchedule;
-import org.mifos.clientportfolio.loan.service.WeeklySchedule;
 import org.mifos.clientportfolio.newloan.applicationservice.CreateGlimLoanAccount;
 import org.mifos.clientportfolio.newloan.applicationservice.CreateLoanAccount;
 import org.mifos.clientportfolio.newloan.applicationservice.GroupMemberAccountDto;
 import org.mifos.clientportfolio.newloan.applicationservice.LoanAccountCashFlow;
 import org.mifos.clientportfolio.newloan.applicationservice.LoanApplicationStateDto;
+import org.mifos.core.MifosRuntimeException;
 import org.mifos.dto.domain.CashFlowDto;
 import org.mifos.dto.domain.CreateAccountFeeDto;
 import org.mifos.dto.domain.CreateAccountPenaltyDto;
@@ -60,13 +60,16 @@ import org.mifos.dto.screen.LoanCreationResultDto;
 import org.mifos.dto.screen.LoanInstallmentsDto;
 import org.mifos.dto.screen.LoanScheduleDto;
 import org.mifos.dto.screen.SearchDetailsDto;
+import org.mifos.dto.screen.UploadedFileDto;
 import org.mifos.platform.questionnaire.service.QuestionGroupDetail;
 import org.mifos.platform.validations.ErrorEntry;
 import org.mifos.service.BusinessRuleException;
+import org.mifos.ui.core.controller.util.helpers.LoanCreationHelper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.binding.message.MessageBuilder;
 import org.springframework.binding.message.MessageContext;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.multipart.commons.CommonsMultipartFile;
 
 @SuppressWarnings("PMD")
 @Controller
@@ -74,6 +77,7 @@ public class LoanAccountController {
 
 	private final LoanAccountServiceFacade loanAccountServiceFacade;
     private final AdminServiceFacade adminServiceFacade;
+    private LoanCreationLoanDetailsDto dto;
 
 	@Autowired
     public LoanAccountController(LoanAccountServiceFacade loanAccountServiceFacade, AdminServiceFacade adminServiceFacade) {
@@ -89,13 +93,13 @@ public class LoanAccountController {
         formBean.setRedoLoanAccount(true);
     }
 
-	public CustomerSearchResultsDto searchCustomers(CustomerSearchFormBean formBean) {
+	public CustomerSearchResultsDto searchCustomers(CustomerSearchFormBean formBean, boolean isNewGLIMCreation) {
 
         // Search result cap. This is needed until ajax search is implemented.
         Integer searchCap = 1000;
 
     	CustomerSearchDto customerSearchDto = new CustomerSearchDto(formBean.getSearchString(), Integer.valueOf(1), searchCap);
-    	List<CustomerSearchResultDto> pagedDetails = this.loanAccountServiceFacade.retrieveCustomersThatQualifyForLoans(customerSearchDto);
+    	List<CustomerSearchResultDto> pagedDetails = this.loanAccountServiceFacade.retrieveCustomersThatQualifyForLoans(customerSearchDto, isNewGLIMCreation);
 
     	//int firstResult = formBean.getPage() * formBean.getPageSize() - (formBean.getPageSize()-1);
 
@@ -108,22 +112,50 @@ public class LoanAccountController {
         LoanCreationProductDetailsDto loanProductDetails = this.loanAccountServiceFacade.retrieveGetProductDetailsForLoanAccountCreation(customerId);
         
         if (loanProductDetails.getErrors().hasErrors()) {
-          
-            ErrorEntry entry = loanProductDetails.getErrors().getErrorEntries().get(0);
-            MessageBuilder builder = new MessageBuilder().error().source(entry.getFieldName())
-            .codes(Arrays.asList(entry.getErrorCode()).toArray(new String[1]))
-            .defaultText(entry.getDefaultMessage());
-
-            messageContext.addMessage(builder.build());
+            
+            List<ErrorEntry> errorList = loanProductDetails.getErrors().getErrorEntries();
+            
+            for(int i=0; i<errorList.size(); i++){
+                MessageBuilder builder = new MessageBuilder().error().source(errorList.get(i).getFieldName())
+                .codes(Arrays.asList(errorList.get(i).getErrorCode()).toArray(new String[1]))
+                .defaultText(errorList.get(i).getDefaultMessage());
+                
+                messageContext.addMessage(builder.build());
+            }
         }
         return loanProductDetails;
     }
 
     @SuppressWarnings("PMD")
-    public LoanCreationLoanDetailsDto retrieveLoanCreationDetails(int customerId, int productId, LoanAccountFormBean formBean) {
+    public LoanCreationLoanDetailsDto retrieveLoanCreationDetails(int customerId, int productId, String eventId, String fileToDelete, LoanAccountFormBean formBean) {
 
+        if ("newFileSelected".equals(eventId)) {
+            if (formBean.getSelectedFile() != null) {
+                CommonsMultipartFile file = formBean.getSelectedFile();
+                formBean.getFiles().add(file);
+                formBean.getFilesMetadata().add(
+                        new UploadedFileDto(file.getOriginalFilename(), file.getContentType(), (int) file.getSize(), formBean
+                                .getSelectedFileDescription()));
+            }
+            return dto;
+        } else if ("fileDeleted".equals(eventId)) {
+            if (fileToDelete != null) {
+                int index = 0;
+                for(CommonsMultipartFile formFile : formBean.getFiles()) {
+                    if (formFile.getOriginalFilename().equals(fileToDelete)) {
+                        index = formBean.getFiles().indexOf(formFile);
+                        break;
+                    }
+                }
+                if (index >= 0) {
+                    formBean.getFiles().remove(index);
+                    formBean.getFilesMetadata().remove(index);
+                }
+            }
+            return dto;
+        }
         MandatoryHiddenFieldsDto mandatoryHidden = this.adminServiceFacade.retrieveHiddenMandatoryFieldsToRead();
-    	LoanCreationLoanDetailsDto dto = this.loanAccountServiceFacade.retrieveLoanDetailsForLoanAccountCreation(customerId, Integer.valueOf(productId).shortValue(), formBean.isRedoLoanAccount());
+    	dto = this.loanAccountServiceFacade.retrieveLoanDetailsForLoanAccountCreation(customerId, Integer.valueOf(productId).shortValue(), formBean.isRedoLoanAccount());
 
     	formBean.setLocale(Locale.getDefault());
     	
@@ -166,6 +198,8 @@ public class LoanAccountController {
                 } else if (dateInformationIsAvailable(dayOfMonth)) {
                     formBean.setDayOfMonthDetails(dayOfMonth, recursEvery);
                 }
+            } else if (recurrenceType == 3) {
+                formBean.setRepaymentRecursEvery(recursEvery);
             }
     	}
 
@@ -175,9 +209,11 @@ public class LoanAccountController {
     	    formBean.setMaxGapInDays(dto.getMaxGapInDays());
     	    formBean.setMinInstallmentAmount(dto.getMinInstallmentAmount());
     	}
-
     	formBean.setGlimApplicable(dto.isGlimApplicable());
-    	if (dto.isGlimApplicable()) {
+        if (dto.isGroup()){
+            formBean.setGroupLoanWithMembersEnabled(dto.isGroupLoanWithMembersEnabled());
+        }
+    	if (dto.isGlimApplicable() || (dto.isGroup() && dto.isGroupLoanWithMembersEnabled())) {
     	    List<LoanAccountDetailsDto> clientData = dto.getClientDetails();
     	    String[] clientGlobalIdArray = new String[clientData.size()];
     	    int index = 0;
@@ -264,6 +300,11 @@ public class LoanAccountController {
 		Number[] selectedFeeAmount = new Number[3];
 		formBean.setSelectedFeeAmount(selectedFeeAmount);
         formBean.setAdditionalFees(dto.getAdditionalFees());
+        
+        if (formBean.getFiles() == null) {
+            formBean.setFiles(new ArrayList<CommonsMultipartFile>());
+            formBean.setFilesMetadata(new ArrayList<UploadedFileDto>());
+        }
 
     	return dto;
     }
@@ -284,11 +325,11 @@ public class LoanAccountController {
 
     public LoanScheduleDto retrieveLoanSchedule(int customerId, int productId, LoanAccountFormBean formBean, BackdatedPaymentable loanScheduleFormBean, boolean resetRedoLoanAccountDetails) {
 
-        LocalDate disbursementDate = translateDisbursementDateToLocalDate(formBean);
+        LocalDate disbursementDate =  LoanCreationHelper.translateDisbursementDateToLocalDate(formBean);
 
-        RecurringSchedule recurringSchedule = determineRecurringSchedule(formBean);
-        List<CreateAccountFeeDto> accountFees = translateToAccountFeeDtos(formBean);
-        List<CreateAccountFeeDto> additionalAccountFees = translateToAdditionalAccountFeeDtos(formBean);
+        RecurringSchedule recurringSchedule = LoanCreationHelper.determineRecurringSchedule(formBean);
+        List<CreateAccountFeeDto> accountFees = LoanCreationHelper.translateToAccountFeeDtos(formBean);
+        List<CreateAccountFeeDto> additionalAccountFees = LoanCreationHelper.translateToAdditionalAccountFeeDtos(formBean);
         accountFees.addAll(additionalAccountFees);
 
         CreateLoanSchedule createLoanAccount = new CreateLoanSchedule(customerId, productId, BigDecimal.valueOf(formBean.getAmount().doubleValue()), formBean.getInterestRate().doubleValue(), disbursementDate,
@@ -430,24 +471,6 @@ public class LoanAccountController {
         return found;
     }
 
-    private LocalDate translateDisbursementDateToLocalDate(LoanAccountFormBean formBean) {
-        return new DateTime().withDate(formBean.getDisbursementDateYY().intValue(), formBean.getDisbursementDateMM().intValue(), formBean.getDisbursementDateDD().intValue()).toLocalDate();
-    }
-
-    private RecurringSchedule determineRecurringSchedule(LoanAccountFormBean formBean) {
-        RecurringSchedule recurringSchedule = null;
-        if (formBean.isMonthly()) {
-            if (formBean.isMonthlyDayOfMonthOptionSelected()) {
-                recurringSchedule = new MonthlyOnDayOfMonthSchedule(formBean.getRepaymentRecursEvery(), formBean.getRepaymentDayOfMonth());
-            } else if (formBean.isMonthlyWeekOfMonthOptionSelected()) {
-                recurringSchedule = new MonthlyOnWeekOfMonthSchedule(formBean.getRepaymentRecursEvery(), formBean.getRepaymentWeekOfMonth(), formBean.getRepaymentDayOfWeek());
-            }
-        } else if (formBean.isWeekly()) {
-            recurringSchedule = new WeeklySchedule(formBean.getRepaymentRecursEvery(), formBean.getRepaymentDayOfWeek());
-        }
-        return recurringSchedule;
-    }
-
     public CashFlowDto retrieveCashFlowSettings(LoanScheduleDto loanScheduleDto, int productId) {
         DateTime firstInstallment = loanScheduleDto.firstInstallment();
         DateTime lastInstallment = loanScheduleDto.lastInstallment();
@@ -514,7 +537,7 @@ public class LoanAccountController {
         formBean.setCashFlowTotalBalance(cashFlowTotalBalance);
         formBean.setRepaymentCapacity(cashFlowDto.getRepaymentCapacity());
         
-        LocalDate disbursementDate = translateDisbursementDateToLocalDate(loanAccountFormBean);
+        LocalDate disbursementDate = LoanCreationHelper.translateDisbursementDateToLocalDate(loanAccountFormBean);
         populateFormBeanFromDto(loanAccountFormBean.getCustomerId(), productId, loanAccountFormBean, formBean, disbursementDate, loanScheduleDto, true);
 
         return cashFlowDataDtos;
@@ -572,11 +595,11 @@ public class LoanAccountController {
     private LoanCreationResultDto submitLoanWithBackdatedPaymentsApplication(Integer accountState, LoanAccountFormBean formBean, LoanAccountQuestionGroupFormBean loanAccountQuestionGroupFormBean,
             LoanAccountCashFlow loanAccountCashFlow, CashFlowSummaryFormBean cashFlowSummaryFormBean, LoanScheduleFormBean loanScheduleFormBean) {
 
-        LocalDate disbursementDate = translateDisbursementDateToLocalDate(formBean);
-        RecurringSchedule recurringSchedule = determineRecurringSchedule(formBean);
-        List<CreateAccountFeeDto> accountFees = translateToAccountFeeDtos(formBean);
-        List<CreateAccountPenaltyDto> accountPenalties = translateToAccountPenaltyDtos(formBean);
-        List<CreateAccountFeeDto> additionalAccountFees = translateToAdditionalAccountFeeDtos(formBean);
+        LocalDate disbursementDate = LoanCreationHelper.translateDisbursementDateToLocalDate(formBean);
+        RecurringSchedule recurringSchedule = LoanCreationHelper.determineRecurringSchedule(formBean);
+        List<CreateAccountFeeDto> accountFees = LoanCreationHelper.translateToAccountFeeDtos(formBean);
+        List<CreateAccountPenaltyDto> accountPenalties = LoanCreationHelper.translateToAccountPenaltyDtos(formBean);
+        List<CreateAccountFeeDto> additionalAccountFees = LoanCreationHelper.translateToAdditionalAccountFeeDtos(formBean);
         accountFees.addAll(additionalAccountFees);
         
         BigDecimal loanAmount = BigDecimal.valueOf(formBean.getAmount().doubleValue());
@@ -636,11 +659,11 @@ public class LoanAccountController {
     private LoanCreationResultDto submitLoanApplication(Integer accountState, LoanAccountFormBean formBean, LoanAccountQuestionGroupFormBean loanAccountQuestionGroupFormBean,
             LoanAccountCashFlow loanAccountCashFlow, CashFlowSummaryFormBean cashFlowSummaryFormBean, LoanScheduleFormBean loanScheduleFormBean) {
 
-        LocalDate disbursementDate = translateDisbursementDateToLocalDate(formBean);
-        RecurringSchedule recurringSchedule = determineRecurringSchedule(formBean);
-        List<CreateAccountFeeDto> accountFees = translateToAccountFeeDtos(formBean);
-        List<CreateAccountFeeDto> additionalAccountFees = translateToAdditionalAccountFeeDtos(formBean);
-        List<CreateAccountPenaltyDto> accountPenalties =translateToAccountPenaltyDtos(formBean);
+        LocalDate disbursementDate =  LoanCreationHelper.translateDisbursementDateToLocalDate(formBean);
+        RecurringSchedule recurringSchedule =  LoanCreationHelper.determineRecurringSchedule(formBean);
+        List<CreateAccountFeeDto> accountFees =  LoanCreationHelper.translateToAccountFeeDtos(formBean);
+        List<CreateAccountFeeDto> additionalAccountFees =  LoanCreationHelper.translateToAdditionalAccountFeeDtos(formBean);
+        List<CreateAccountPenaltyDto> accountPenalties = LoanCreationHelper.translateToAccountPenaltyDtos(formBean);
         accountFees.addAll(additionalAccountFees);
         
         BigDecimal loanAmount = BigDecimal.valueOf(formBean.getAmount().doubleValue());
@@ -683,59 +706,25 @@ public class LoanAccountController {
                         loanAccountQuestionGroupFormBean.getQuestionGroups(), loanAccountCashFlow);
             }
         }
+        
+        List<CommonsMultipartFile> formFiles = formBean.getFiles();
+        List<UploadedFileDto> filesMetadata = formBean.getFilesMetadata();
+        
+        for(int i=0; i<formFiles.size(); i++)
+        {
+            if (formFiles.get(i).getSize() != 0) {
+                InputStream inputStream;
+                try {
+                    inputStream = formFiles.get(i).getInputStream();
+                } catch (IOException e) {
+                    throw new MifosRuntimeException();
+                }
+                UploadedFileDto fileMetadata = filesMetadata.get(i);
+                loanAccountServiceFacade.uploadFile(loanCreationResultDto.getAccountId(), inputStream, fileMetadata);
+            }
+        }
+        
         return loanCreationResultDto;
-    }
-
-    private List<CreateAccountFeeDto> translateToAdditionalAccountFeeDtos(LoanAccountFormBean formBean) {
-        List<CreateAccountFeeDto> accountFees = new ArrayList<CreateAccountFeeDto>();
-
-        int index = 0;
-        for (Number feeId : formBean.getSelectedFeeId()) {
-            if (feeId != null) {
-                Number feeAmountOrRate = formBean.getSelectedFeeAmount()[index];
-                CreateAccountFeeDto accountFee = new CreateAccountFeeDto(feeId.intValue(), feeAmountOrRate.toString());
-                accountFees.add(accountFee);
-            }
-            index++;
-        }
-
-        return accountFees;
-    }
-
-    private List<CreateAccountFeeDto> translateToAccountFeeDtos(LoanAccountFormBean formBean) {
-        List<CreateAccountFeeDto> accountFees = new ArrayList<CreateAccountFeeDto>();
-        Number[] defaultFeeIds = formBean.getDefaultFeeId();
-        if (defaultFeeIds != null) {
-            int feeIndex = 0;
-            for (Number feeId : defaultFeeIds) {
-                Boolean removeDefaultFeeSelected = formBean.getDefaultFeeSelected()[feeIndex];
-                if (removeDefaultFeeSelected == null || !removeDefaultFeeSelected) {
-                    String amount = formBean.getDefaultFeeAmountOrRate()[feeIndex].toString();
-                    CreateAccountFeeDto accountFee = new CreateAccountFeeDto(feeId.intValue(), amount);
-                    accountFees.add(accountFee);
-                }
-                feeIndex++;
-            }
-        }
-        return accountFees;
-    }
-    
-    private List<CreateAccountPenaltyDto> translateToAccountPenaltyDtos(LoanAccountFormBean formBean) {
-        List<CreateAccountPenaltyDto> accountPenalties = new ArrayList<CreateAccountPenaltyDto>();
-        Number[] defaultPenaltyIds = formBean.getDefaultPenaltyId();
-        if (defaultPenaltyIds != null) {
-            int penaltyIndex = 0;
-            for (Number penaltyId : defaultPenaltyIds) {
-                Boolean removeDefaultPenaltySelected = formBean.getDefaultPenaltySelected()[penaltyIndex];
-                if (removeDefaultPenaltySelected == null || !removeDefaultPenaltySelected) {
-                    String amount = formBean.getDefaultPenaltyAmountOrRate()[penaltyIndex].toString();
-                    CreateAccountPenaltyDto accountPenalty = new CreateAccountPenaltyDto(penaltyId.intValue(), amount);
-                    accountPenalties.add(accountPenalty);
-                }
-                penaltyIndex++;
-            }
-        }
-        return accountPenalties;
     }
 
     @SuppressWarnings("PMD")

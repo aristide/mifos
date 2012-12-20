@@ -1250,12 +1250,25 @@ public class LoanAccountActionForm extends BaseActionForm implements QuestionRes
                 if (StringUtils.isBlank(this.getRecurWeek()) || StringUtils.isBlank(this.getWeekDay())) {
                     addError(errors, "", LoanExceptionConstants.REPAYMENTDAYISREQUIRED, "");
                 }
+                else {
+                    try{
+                        Short.parseShort(this.getRecurWeek());
+                    }
+                    catch (NumberFormatException e) {
+                        addError(errors, "", LoanExceptionConstants.REPAYMENTDAY_WRONGFORMAT, "");
+                    }
+                }
             } else {
                 if (getMonthType().equals("1")) {
                     // "10th day of the month"
                     if (StringUtils.isBlank(this.getMonthDay()) || StringUtils.isBlank(this.getDayRecurMonth())) {
                         addError(errors, "", LoanExceptionConstants.REPAYMENTDAYISREQUIRED, "");
                     }
+                    short dayNumber = dayMonthParse();
+                    if ((dayNumber < 1 || dayNumber > 31)) {
+                    	addError(errors, "", LoanExceptionConstants.REPAYMENTDAY_WRONGFORMAT, "");
+                    }
+                    
                 } else {
                     // "1st Monday of every month"
                     if (StringUtils.isBlank(this.getMonthRank()) || StringUtils.isBlank(this.getMonthWeek())
@@ -1265,6 +1278,17 @@ public class LoanAccountActionForm extends BaseActionForm implements QuestionRes
                 }
             }
         }
+    }
+
+    private short dayMonthParse() {
+        short dayNumber;
+        try{
+            dayNumber = Short.parseShort(this.getMonthDay());
+        }
+        catch (NumberFormatException err){
+            dayNumber=0;
+        }    
+        return dayNumber;
     }
 
     private void validateIndividualLoanFieldsForGlim(ActionErrors errors, Locale locale, MifosCurrency currency) {

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.joda.time.DateTime;
+import org.mifos.accounts.business.AccountActionDateEntity;
 import org.mifos.accounts.business.AccountBO;
 import org.mifos.accounts.fees.business.FeeBO;
 import org.mifos.accounts.loan.business.LoanBO;
@@ -61,6 +62,7 @@ import org.mifos.dto.screen.ClientDisplayDto;
 import org.mifos.dto.screen.GroupDisplayDto;
 import org.mifos.dto.screen.LoanCycleCounter;
 import org.mifos.framework.components.fieldConfiguration.business.FieldConfigurationEntity;
+import org.mifos.framework.fileupload.domain.ClientFileEntity;
 import org.mifos.framework.hibernate.helper.QueryResult;
 import org.mifos.security.util.UserContext;
 
@@ -88,6 +90,22 @@ public interface CustomerDao {
     GroupBO findGroupBySystemId(String globalCustNum);
 
     CenterBO findCenterBySystemId(String globalCustNum);
+    
+    List<ClientBO> findAllBorrowers(int position, int numberOfObjects);
+    
+    List<ClientBO> findBorrowersUnderLoanOfficer(int position,int noOfObjects,Short loanOffID);
+    
+    int countAllBorrowers();
+    
+    int countAllBorrowersGroup();
+    
+    int countBorrowersUnderLoanOfficer(Short loanOffID);
+    
+    int countBorrowersGroupUnderLoanOfficer(Short loanOffID);
+    
+    List<GroupBO> findAllBorrowersGroup(int position,int noOfObjects);
+    
+    List<GroupBO> findBorrowersGroupUnderLoanOfficer(int position,int noOfObjects,Short loanOffID);
 
     List<ClientBO> findActiveClientsUnderGroup(CustomerBO customer);
 
@@ -160,6 +178,30 @@ public interface CustomerDao {
     int countOfClients();
 
     int countOfGroups();
+    
+    int countOfActiveClients();
+
+    int countOfActiveGroups();
+    
+    int countOfActiveCenters();
+    
+    int countOfActiveClientsUnderLoanOfficer(Short loanOffID);
+
+    int countOfActiveGroupsUnderLoanOfficer(Short loanOffID);
+    
+    int countOfActiveCentersUnderLoanOfficer(Short loanOffID);
+    
+    List<ClientBO> findAllActiveClients(int position,int noOfObjects);
+
+    List<GroupBO> findAllActiveGroups(int position,int noOfObjects);
+    
+    List<CenterBO> findAllActiveCenters(int position,int noOfObjects);
+    
+    List<ClientBO> findActiveClientsUnderLoanOfficer(int position,int noOfObjects,Short loanOffID);
+
+    List<GroupBO> findActiveGroupsUnderLoanOfficer(int position,int noOfObjects,Short loanOffID);
+    
+    List<CenterBO> findActiveCentersUnderLoanOfficer(int position,int noOfObjects,Short loanOffID);
 
     int retrieveLastSearchIdValueForNonParentCustomersInOffice(Short officeIdValue);
 
@@ -239,4 +281,12 @@ public interface CustomerDao {
 	Date getLastMeetingDateForCustomer(Integer customerId);
 	
 	Date getFirstMeetingDateForCustomer(Integer customerId);
+	
+	List<DateTime> getAccountActionDatesForCustomer(Integer customerId);
+	
+	ClientFileEntity getUploadedFile(Long fileId);
+		
+	List<ClientFileEntity> getClientAllUploadedFiles(Integer clientId);
+	
+	ClientFileEntity getClientUploadedFileByName(Integer clientId, String fileName);
 }

@@ -39,7 +39,9 @@
     <bean id="loanPrdBusinessService" class="org.mifos.accounts.productdefinition.business.service.LoanPrdBusinessService" />
 
     <bean id="loanAccountServiceFacade" class="org.mifos.application.servicefacade.LoanAccountServiceFacadeWebTier" />
-
+    
+    <bean id="groupLoanAccountServiceFacade" class="org.mifos.application.servicefacade.GroupLoanAccountServiceFacadeWebTier" />
+    
     <bean id="collectionSheetService" class="org.mifos.application.servicefacade.CollectionSheetServiceImpl"/>
 
     <bean id="saveCollectionSheetAssembler" class="org.mifos.application.servicefacade.SaveCollectionSheetAssembler"/>
@@ -53,6 +55,8 @@
     <bean id="groupServiceFacade" class="org.mifos.application.servicefacade.GroupServiceFacadeWebTier" />
 
     <bean id="clientServiceFacade" class="org.mifos.application.servicefacade.ClientServiceFacadeWebTier" />
+    
+    <bean id="coaServiceFacade" class="org.mifos.application.servicefacade.CoaServiceFacadeWebTier" />
     
     <!-- Client photo service o -->
     <bean class="org.mifos.framework.image.service.ClientPhotoServiceConfiguration" />
@@ -134,5 +138,11 @@
     <bean id="importLoansSavingsFacade" class="org.mifos.application.importexport.servicefacade.ImportLoansSavingsFacadeWebTier" />
     
     <bean id="adminDocumentsServiceFacade" class="org.mifos.reports.admindocuments.service.AdminDocumentsServiceImpl" />
+    
+    <bean id="dashboardServiceFacade" class="org.mifos.application.servicefacade.DashboardServiceFacadeWebTier" />
+
+    <bean id="clientFileService" class="org.mifos.framework.fileupload.service.ClientFileServiceFileSystem" />
+    
+    <bean id="loanFileService" class="org.mifos.framework.fileupload.service.LoanFileServiceFileSystem" />
     
 </beans>

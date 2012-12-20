@@ -338,7 +338,7 @@ public class CustomerPersistence extends LegacyGenericDao {
         return queryResult;
     }
 
-    public QueryResult searchGroupClient(final String searchString, final Short userId) throws ConfigurationException,
+    public QueryResult searchGroupClient(final String searchString, final Short userId, boolean isNewGLIMCreation) throws ConfigurationException,
             PersistenceException {
         String[] namedQuery = new String[2];
         List<Param> paramList = new ArrayList<Param>();
@@ -349,7 +349,12 @@ public class CustomerPersistence extends LegacyGenericDao {
             namedQuery[0] = NamedQueryConstants.SEARCH_GROUP_CLIENT_COUNT_LO;
             namedQuery[1] = NamedQueryConstants.SEARCH_GROUP_CLIENT_LO;
             paramList.add(typeNameValue("Short", "PERSONNEL_ID", userId));
-        } else {
+        } 
+        else if (isNewGLIMCreation) {
+            namedQuery[0] = NamedQueryConstants.SEARCH_GROUP_FOR_GROUP_LOAN_COUNT;
+            namedQuery[1] = NamedQueryConstants.SEARCH_GROUP_FOR_GROUP_LOAN;
+        }
+        else {
             namedQuery[0] = NamedQueryConstants.SEARCH_GROUP_CLIENT_COUNT;
             namedQuery[1] = NamedQueryConstants.SEARCH_GROUP_CLIENT;
         }
@@ -440,9 +445,10 @@ public class CustomerPersistence extends LegacyGenericDao {
                     words.add("");
                 }
             }
-            paramList.add(typeNameValue("String", "SEARCH_STRING1", words.get(0)));
-            paramList.add(typeNameValue("String", "SEARCH_STRING2", words.get(1)));
-            paramList.add(typeNameValue("String", "SEARCH_STRING3", words.get(2)));
+
+            paramList.add(typeNameValue("String", "SEARCH_STRING1", "%"+words.get(0)+"%"));
+            paramList.add(typeNameValue("String", "SEARCH_STRING2", "%"+words.get(1)+"%"));
+            paramList.add(typeNameValue("String", "SEARCH_STRING3", "%"+words.get(2)+"%"));
         } else {
             paramList.add(typeNameValue("String", "SEARCH_STRING1", searchString));
             paramList.add(typeNameValue("String", "SEARCH_STRING2", ""));

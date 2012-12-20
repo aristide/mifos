@@ -33,7 +33,7 @@ explanation of the license and how it is applied.
 			
 				<table width="95%" border="0" cellpadding="0" cellspacing="0">
 					<tr>
-						<td width="70%" height="24" align="left" valign="top"
+						<td width="40%" height="24" align="left" valign="top"
 							class="paddingL10">
 							<table width="96%" border="0" cellpadding="3" cellspacing="0">
 								<tr>
@@ -133,6 +133,90 @@ explanation of the license and how it is applied.
 								</tr>
 							</table>
 						</td>
+      
+                        <!-- MIFOS- 5756 Dashboard with statistics -->
+                        <td width="40%" align="right" height="25" valign="top" class="paddingL10"> 
+                        <c:set var="dashboard" value="${session:getFromSession(sessionScope.flowManager,requestScope.currentFlowKey,'dashboard')}" />
+                        <table width="60%" border="0" cellpadding="2" cellspacing="1" 
+                        class="bluetableborder">
+                        <tr>
+                            <td class="bluetablehead05"><span class="fontnormalbold">
+                                <mifos:mifoslabel name="CustomerSearch.dashboardTitle"/>:</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="paddingL10"><span class="fontnormal">
+                            <c:url value="viewTotalBorrowersDBDetails.ftl" var="viewTotalBorrowersDBDetailsUrl" />
+                            <a href="${viewTotalBorrowersDBDetailsUrl}">
+                            <mifos:mifoslabel name="CustomerSearch.dashboardBorrowers"/>:</a>
+                             <c:out
+                                value="${dashboard.borrowersCount}" />
+                            </span></td>
+                        </tr>
+                         <tr>
+                            <td class="paddingL10"><span class="fontnormal">
+                            <c:url value="viewTotalBorrowersGroupDBDetails.ftl" var="viewTotalBorrowersGroupDBDetailsUrl" />
+                            <a href="${viewTotalBorrowersGroupDBDetailsUrl}">
+                            <mifos:mifoslabel name="CustomerSearch.dashboardBorrowersGroup"/>:</a>
+                             <c:out
+                                value="${dashboard.borrowersGroupCount}" />
+                            </span></td>
+                         </tr>
+                         <tr>
+                            <td class="paddingL10"><span class="fontnormal">
+                            <c:url value="viewActiveCentersDBDetails.ftl" var="viewActiveCentersDBDetailsUrl" />
+                            <a href="${viewActiveCentersDBDetailsUrl}">
+                            <mifos:mifoslabel name="CustomerSearch.dashboardActiveCenters"/>:</a>
+                             <c:out 
+                             value="${dashboard.activeCentersCount}" />
+                            </span></td>
+                         </tr>
+                         <tr>
+                            <td class="paddingL10"><span class="fontnormal">
+                            <c:url value="viewActiveGroupsDBDetails.ftl" var="viewActiveGroupsDBDetailsUrl" />
+                            <a href="${viewActiveGroupsDBDetailsUrl}">
+                            <mifos:mifoslabel name="CustomerSearch.dashboardActiveGroups"/>:</a>
+                             <c:out
+                                value="${dashboard.activeGroupsCount}" />
+                            </span></td>
+                         </tr>
+                         <tr>
+                            <td class="paddingL10"><span class="fontnormal">
+                            <c:url value="viewActiveClientsDBDetails.ftl" var="viewActiveClientsDBDetailsUrl" />
+                            <a href="${viewActiveClientsDBDetailsUrl}">
+                            <mifos:mifoslabel name="CustomerSearch.dashboardActiveClients"/>:</a>
+                             <c:out
+                                value="${dashboard.activeClientsCount}" />
+                            </span></td>
+                         </tr>
+                         <tr>
+                            <td class="paddingL10"><span class="fontnormal">
+                            <c:url value="viewWaitingForApprovalLoansDBDetails.ftl" var="viewWaitingForApprovalLoansDBDetailsUrl" />
+                            <a href="${viewWaitingForApprovalLoansDBDetailsUrl}">
+                            <mifos:mifoslabel name="CustomerSearch.dashboardLoansWaitingForApproval"/>:</a>
+                            <c:out value="${dashboard.waitingForApprovalLoansCount}"/>
+                            </span></td>
+                         </tr>
+                         <tr>
+                            <td class="paddingL10"><span class="fontnormal">
+                            <c:url value="viewBadStandingLoansDBDetails.ftl" var="viewBadStandingLoansDBDetailsUrl" />
+                            <a href="${viewBadStandingLoansDBDetailsUrl}">
+                            <mifos:mifoslabel name="CustomerSearch.dashboardLoansInArrears"/>:</a>
+                             <c:out
+                                value="${dashboard.loansInArrearsCount}" />
+                            </span></td>
+                         </tr>
+                         <tr>
+                            <td class="paddingL10"><span class="fontnormal">
+                            <c:url value="viewLoansToBePaidCurrWeekDBDetails.ftl" var="viewLoansToBePaidCurrWeekDBDetailsUrl" />
+                            <a href="${viewLoansToBePaidCurrWeekDBDetailsUrl}" ><mifos:mifoslabel name="CustomerSearch.dashboardCurrWeekPaidLoans"/>:</a>
+                             <c:out
+                                value="${dashboard.loansToBePaidCurrentWeek}" />
+                                </span></td>
+                        </tr>
+
+                    </table>
+                        </td>
 					</tr>
 				</table>
 				<html-el:hidden property="officeId" value="0"/>

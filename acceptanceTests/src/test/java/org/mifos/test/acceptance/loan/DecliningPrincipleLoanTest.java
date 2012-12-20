@@ -33,6 +33,7 @@ import org.mifos.test.acceptance.framework.loan.CreateLoanAccountSubmitParameter
 import org.mifos.test.acceptance.framework.loan.DisburseLoanParameters;
 import org.mifos.test.acceptance.framework.loan.LoanAccountPage;
 import org.mifos.test.acceptance.framework.loanproduct.DefineNewLoanProductPage;
+import org.mifos.test.acceptance.framework.testhelpers.CustomPropertiesHelper;
 import org.mifos.test.acceptance.framework.testhelpers.LoanTestHelper;
 import org.mifos.test.acceptance.framework.testhelpers.NavigationHelper;
 import org.mifos.test.acceptance.loanproduct.LoanProductTestHelper;
@@ -53,6 +54,7 @@ public class DecliningPrincipleLoanTest extends UiTestCaseBase {
     private final static String clientName = "Client WeeklyTue";
     LoanProductTestHelper loanProductTestHelper;
     LoanTestHelper loanTestHelper;
+    CustomPropertiesHelper propertiesHelper;
     DateTime systemDateTime;
     NavigationHelper navigationHelper;
     String interestTypeName = "Declining Balance-Interest Recalculation";
@@ -69,6 +71,7 @@ public class DecliningPrincipleLoanTest extends UiTestCaseBase {
         (new MifosPage(selenium)).logout();
         applicationDatabaseOperation.updateLSIM(0);
         applicationDatabaseOperation.updateGapBetweenDisbursementAndFirstMeetingDate(1);
+        propertiesHelper.setOverdueInterestPaidFirst("false");
     }
 
     @Override
@@ -78,6 +81,7 @@ public class DecliningPrincipleLoanTest extends UiTestCaseBase {
         super.setUp();
         navigationHelper = new NavigationHelper(selenium);
         loanTestHelper = new LoanTestHelper(selenium);
+        propertiesHelper = new CustomPropertiesHelper(selenium);
         loanProductTestHelper = new LoanProductTestHelper(selenium);
         systemDateTime = new DateTime(2010, 10, 11, 10, 0, 0, 0);
         TestDataSetup dataSetup = new TestDataSetup(selenium, applicationDatabaseOperation);
@@ -85,7 +89,6 @@ public class DecliningPrincipleLoanTest extends UiTestCaseBase {
         dataSetup.addDecliningPrincipalBalance();
     }
 
-    
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")    // one of the dependent methods throws Exception
     @Test(enabled=true)
     public void verifyDecliningPrincipleLoan() throws Exception {
@@ -111,6 +114,7 @@ public class DecliningPrincipleLoanTest extends UiTestCaseBase {
         verifyLateExcessPayment("000100000000027");
         verifyLateLessPayment("000100000000028");
         verifyMultipleDue("000100000000029");
+        verifyOverdue();
     }
     
     private void verifyEarlyWholePayment() throws UnsupportedEncodingException {
@@ -252,6 +256,35 @@ public class DecliningPrincipleLoanTest extends UiTestCaseBase {
         DateTime paymentDate = systemDateTime.plusDays(1);
         navigationHelper.navigateToLoanAccountPage(accountID);
         makePaymentAndVerifyPayment(accountID, paymentDate, "280", RepaymentScheduleData.EARLY_EXCESS_FIRST_PAYMENT);
+    }
+    
+    private void verifyOverdue() throws UnsupportedEncodingException {
+        propertiesHelper.setOverdueInterestPaidFirst("true");
+        DateTime testDateTime = new DateTime(2010, 10, 12, 0, 0, 0, 0);
+        loanTestHelper.setApplicationTime(testDateTime);
+        DisburseLoanParameters disburseParams = new DisburseLoanParameters();
+        disburseParams.setDisbursalDateDD("12");
+        disburseParams.setDisbursalDateMM("10");
+        disburseParams.setDisbursalDateYYYY("2010");
+        disburseParams.setPaymentType(DisburseLoanParameters.CASH);
+        LoanAccountPage loanAccountPage = 
+                loanTestHelper.createLoanAccount(clientName, "WeeklyPawdepLoan")
+                .changeAccountStatusToAccepted().disburseLoan(disburseParams);
+        String accountId = loanAccountPage.getAccountId();
+        loanTestHelper.setApplicationTime(testDateTime.plusWeeks(5));
+        verifyOverdueSummary(accountId);
+        verifyOverduePayment(accountId, testDateTime);
+    }
+    
+    private void verifyOverdueSummary(String accountId) throws UnsupportedEncodingException {
+        LoanAccountPage loanAccountPage = navigationHelper.navigateToLoanAccountPage(accountId);
+        loanAccountPage.verifyAccountSummary(RepaymentScheduleData.ACCOUNT_SUMMARY_OVERDUE);
+    }
+    
+    private void verifyOverduePayment(String accountId, DateTime disbursementDate) throws UnsupportedEncodingException {
+        navigationHelper.navigateToLoanAccountPage(accountId);
+        loanTestHelper.makePayment(disbursementDate.plusWeeks(5), "1023.5").verifyAccountSummary(
+                RepaymentScheduleData.ACCOUNT_SUMMARY_OVERDUE_REPAYMENT);
     }
 
     private String makePaymentAndVerifyPayment(String accountId, DateTime paymentDate, String paymentAmount, String[][] expectedSchedule) throws UnsupportedEncodingException {

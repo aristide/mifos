@@ -20,9 +20,11 @@
 
 package org.mifos.application.servicefacade;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -70,6 +72,7 @@ import org.mifos.dto.screen.LoanScheduleDto;
 import org.mifos.dto.screen.MultipleLoanAccountDetailsDto;
 import org.mifos.dto.screen.RepayLoanDto;
 import org.mifos.dto.screen.RepayLoanInfoDto;
+import org.mifos.dto.screen.UploadedFileDto;
 import org.mifos.platform.questionnaire.service.QuestionGroupDetail;
 import org.mifos.platform.validations.Errors;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -89,7 +92,7 @@ public interface LoanAccountServiceFacade extends LoanDisbursementDateValidation
     void addNote(CreateAccountNote accountNote);
     
     @PreAuthorize("isFullyAuthenticated() and hasAnyRole('ROLE_REDO_CAN_CREATE_BACKDATED_LOANS', 'ROLE_CAN_CREATE_NEW_LOAN_IN_SAVE_FOR_LATER_STATE', 'ROLE_CAN_CREATE_NEW_LOAN_IN_SUBMIT_FOR_APPROVAL_STATE')")
-    List<CustomerSearchResultDto> retrieveCustomersThatQualifyForLoans(CustomerSearchDto customerSearchDto);
+    List<CustomerSearchResultDto> retrieveCustomersThatQualifyForLoans(CustomerSearchDto customerSearchDto, boolean isNewGLIMCreation);
 
     @PreAuthorize("isFullyAuthenticated() and hasAnyRole('ROLE_REDO_CAN_CREATE_BACKDATED_LOANS', 'ROLE_CAN_CREATE_NEW_LOAN_IN_SAVE_FOR_LATER_STATE', 'ROLE_CAN_CREATE_NEW_LOAN_IN_SUBMIT_FOR_APPROVAL_STATE')")
     LoanCreationProductDetailsDto retrieveGetProductDetailsForLoanAccountCreation(Integer customerId);
@@ -259,4 +262,15 @@ public interface LoanAccountServiceFacade extends LoanDisbursementDateValidation
 
     @PreAuthorize("isFullyAuthenticated()")
     List<AccountPaymentDto> getLoanAccountPayments(String globalAccountNum);
+    
+    Integer getGroupLoanType(String globalAccountNum);
+    
+    @PreAuthorize("isFullyAuthenticated()")
+    void makeEarlyGroupRepayment(RepayLoanInfoDto repayLoanInfoDto, Map<String, Double> memberNumWithAmount);
+    
+    @PreAuthorize("isFullyAuthenticated()")
+    BigDecimal calculateInterestDueForCurrentInstalmanet(RepayLoanInfoDto repayLoanInfoDto);
+
+    @PreAuthorize("isFullyAuthenticated()")
+    void uploadFile(Integer accountId, InputStream inputStream, UploadedFileDto fileMetadata);
 }

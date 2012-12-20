@@ -24,6 +24,7 @@ import java.util.List;
 
 import org.mifos.accounts.loan.business.LoanBO;
 import org.mifos.dto.domain.SurveyDto;
+import org.mifos.framework.fileupload.domain.LoanFileEntity;
 
 public interface LoanDao {
 
@@ -36,4 +37,34 @@ public interface LoanDao {
     List<SurveyDto> getAccountSurveyDto(Integer accountId);
 
     List<LoanBO> findIndividualLoans(Integer accountId);
+    
+    List<LoanBO> findAllBadStandingLoans(int position,int noOfObjects);
+    
+    List<LoanBO> findBadStandingLoansUnderLoanOfficer(int position,int noOfObjects,Short loanOfficerId);
+    
+    int countAllBadStandingLoans();
+    
+    int countBadStandingLoansUnderLoanOfficer(Short loanOfficerId);
+    
+    List<LoanBO> findAllLoansWaitingForApproval(int position,int noOfObjects);
+    
+    List<LoanBO> findLoansWaitingForApprovalUnderLoanOfficer(int position,int noOfObjects,Short loanOfficerId);
+    
+    int countAllLoansWaitingForApproval();
+    
+    int countLoansWaitingForApprovalUnderLoanOfficer(Short loanOfficerId);
+    
+    List<LoanBO> findLoansToBePaidCurrentWeek(int position,int noOfObjects);
+    
+    List<LoanBO> findLoansToBePaidCurrentWeekUnderLoanOfficer(int position,int noOfObjects,Short loanOfficerId);
+    
+    int countLoansToBePaidCurrentWeek();
+    
+    int countLoansToBePaidCurrentWeekUnderLoanOfficer(Short loanOfficerId);
+    
+    LoanFileEntity getUploadedFile(Long fileId);
+    
+    List<LoanFileEntity> getLoanAllUploadedFiles(Integer accountId);
+    
+    LoanFileEntity getLoanUploadedFileByName(Integer accountId, String fileName);
 }
